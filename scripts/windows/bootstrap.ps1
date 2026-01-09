@@ -17,6 +17,9 @@ function Has-Command($name) {
 }
 
 Write-Host "m3uHandler Windows bootstrap"
+Write-Host "If this script is blocked by PowerShell execution policy, run it with:"
+Write-Host "  powershell -ExecutionPolicy Bypass -File scripts\\windows\\bootstrap.ps1"
+Write-Host ""
 
 if (-not (Has-Command "node") -or -not (Has-Command "npm")) {
   Write-Warning "node/npm not found. Attempting to install Node.js LTS via winget ($NodeWingetId)..."
@@ -48,7 +51,7 @@ if ($LASTEXITCODE -ne 0) {
   exit 1
 }
 
-Write-Host "Done. You can now run:"
+Write-Host "Done. You can now run (from the repo folder):"
 Write-Host "  npm run gui"
 Write-Host ""
 Write-Host "If you just installed Node.js, open a NEW PowerShell window to ensure PATH is refreshed."
