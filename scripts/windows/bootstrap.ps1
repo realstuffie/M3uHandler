@@ -50,3 +50,5 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "Done. You can now run:"
 Write-Host "  npm run gui"
+Write-Host ""
+Write-Host "If you just installed Node.js, open a NEW PowerShell window to ensure PATH is refreshed."
