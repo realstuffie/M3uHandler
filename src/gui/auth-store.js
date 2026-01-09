@@ -3,11 +3,12 @@
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
-const envPaths = require('env-paths');
+const envPathsMod = require('env-paths');
 
 const SERVICE = 'm3uHandler-gui';
 const ACCOUNT_PREFIX = 'user:';
 
+const envPaths = envPathsMod.default || envPathsMod;
 const paths = envPaths('m3uHandler');
 const fallbackAuthPath = path.join(paths.config, 'gui-auth.json');
 
