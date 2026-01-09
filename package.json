@@ -1,0 +1,28 @@
+{
+  "name": "m3uhandler",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "cli": "node src/index.js",
+    "gui": "node src/gui/server.js",
+    "daemon": "node src/daemon.js",
+    "config": "node src/config.js",
+    "gui-user": "node src/gui-user.js",
+    "install-deps": "node scripts/install-deps.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "env-paths": "^3.0.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.2.1",
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2",
+    "undici": "^7.18.2"
+  }
+}
