@@ -5,18 +5,12 @@ const os = require('os');
 const path = require('path');
 const { setTimeout: sleep } = require('timers/promises');
 const { convertM3U } = require('./convert');
+const { fetchWithTimeout } = require('./fetch-util');
 
-async function getFetch() {
-  if (typeof globalThis.fetch === 'function') return globalThis.fetch.bind(globalThis);
-  // Fallback for older Node versions: undici provides fetch
-  const undici = require('undici');
-  if (typeof undici.fetch !== 'function') throw new Error('undici.fetch is not available');
-  return undici.fetch;
-}
+const DEFAULT_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 30000);
 
 async function fetchText(url) {
-  const fetch = await getFetch();
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetchWithTimeout(url, { redirect: 'follow' }, { timeoutMs: DEFAULT_TIMEOUT_MS });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`Fetch failed: ${res.status} ${res.statusText}${body ? `\n${body.slice(0, 500)}` : ''}`);
@@ -142,7 +136,8 @@ async function main() {
 
   if (args.help || !finalUrl) {
     console.log(usage());
-    process.exit(args.help ? 0 : 1);
+    process.exitCode = args.help ? 0 : 1;
+    return;
   }
   if (!Number.isFinite(args.intervalSeconds) || args.intervalSeconds <= 0) {
     throw new Error('Interval must be a positive number.');
@@ -197,5 +192,6 @@ Delete missing: ${args.deleteMissing}`);
 
 main().catch((err) => {
   console.error(err?.stack || String(err));
-  process.exit(1);
+  process.exitCode = 1;
 });
+

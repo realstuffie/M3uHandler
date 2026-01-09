@@ -234,7 +234,7 @@ async function convertM3U({
             // Best-effort: remove empty dirs after deletions
             try {
               const remaining = await fs.promises.readdir(full);
-              if (remaining.length === 0) await fs.promises.rmdir(full);
+              if (remaining.length === 0) await fs.promises.rm(full, { recursive: true, force: true });
             } catch {}
           } else if (ent.isFile() && ent.name.toLowerCase().endsWith('.strm')) {
             const relFromOut = path.relative(outRoot, full);

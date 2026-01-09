@@ -51,7 +51,8 @@ async function run() {
   const args = parseArgs(process.argv);
   if (args.help || !args.input) {
     console.log(usage());
-    process.exit(args.help ? 0 : 1);
+    process.exitCode = args.help ? 0 : 1;
+    return;
   }
 
   const inputPath = path.resolve(args.input);
@@ -75,5 +76,5 @@ Output: ${outRoot}`);
 
 run().catch((err) => {
   console.error(err?.stack || String(err));
-  process.exit(1);
+  process.exitCode = 1;
 });

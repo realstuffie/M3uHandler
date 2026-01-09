@@ -12,8 +12,8 @@ Param(
 #
 # Run from PowerShell.
 
-function Has-Command($name) {
-  return [bool](Get-Command $name -ErrorAction SilentlyContinue)
+function Test-Command($Name) {
+  return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
 Write-Host "m3uHandler Windows bootstrap"
@@ -21,10 +21,10 @@ Write-Host "If this script is blocked by PowerShell execution policy, run it wit
 Write-Host "  powershell -ExecutionPolicy Bypass -File scripts\\windows\\bootstrap.ps1"
 Write-Host ""
 
-if (-not (Has-Command "node") -or -not (Has-Command "npm")) {
+if (-not (Test-Command "node") -or -not (Test-Command "npm")) {
   Write-Warning "node/npm not found. Attempting to install Node.js LTS via winget ($NodeWingetId)..."
 
-  if (-not (Has-Command "winget")) {
+  if (-not (Test-Command "winget")) {
     Write-Error "winget is not available on this system. Install 'App Installer' from Microsoft Store or install Node.js manually from https://nodejs.org/."
     exit 1
   }

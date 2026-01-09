@@ -9,16 +9,12 @@
  * Note: uses global fetch if available, else undici.fetch (already a project dependency).
  */
 
-async function getFetch() {
-  if (typeof globalThis.fetch === 'function') return globalThis.fetch.bind(globalThis);
-  const undici = require('undici');
-  if (typeof undici.fetch !== 'function') throw new Error('undici.fetch is not available');
-  return undici.fetch;
-}
+const { fetchWithTimeout } = require('./fetch-util');
+
+const DEFAULT_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 30000);
 
 async function fetchTextStrict(url) {
-  const fetch = await getFetch();
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetchWithTimeout(url, { redirect: 'follow' }, { timeoutMs: DEFAULT_TIMEOUT_MS });
   if (res.status === 404) {
     const err = new Error('Not Found');
     err.code = 404;

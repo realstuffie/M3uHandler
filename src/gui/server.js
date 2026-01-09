@@ -9,8 +9,11 @@ const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const { convertM3U } = require('../convert');
 const { fetchPagedM3U } = require('../paged-fetch');
+const { fetchWithTimeout } = require('../fetch-util');
 const { loadConfig, saveConfig, safeUrlHost, CONFIG_PATH } = require('../plain-config');
 const { verifyUserPassword, hasUser } = require('./auth-store');
+
+const DEFAULT_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 30000);
 
 const app = express();
 
@@ -18,7 +21,11 @@ const app = express();
 const uploadDir = path.join(os.tmpdir(), 'm3uHandlerUploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 
-const upload = multer({ dest: uploadDir });
+const upload = multer({
+  dest: uploadDir,
+  // Limit upload size to reduce DoS risk. Increase if you have very large playlists.
+  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MiB
+});
 
 app.use(express.urlencoded({ extended: true }));
 app.use((req, res, next) => {
@@ -170,16 +177,8 @@ let daemonState = {
   },
 };
 
-async function getFetch() {
-  if (typeof globalThis.fetch === 'function') return globalThis.fetch.bind(globalThis);
-  const undici = require('undici');
-  if (typeof undici.fetch !== 'function') throw new Error('undici.fetch is not available');
-  return undici.fetch;
-}
-
 async function fetchText(url) {
-  const fetch = await getFetch();
-  const res = await fetch(url, { redirect: 'follow' });
+  const res = await fetchWithTimeout(url, { redirect: 'follow' }, { timeoutMs: DEFAULT_TIMEOUT_MS });
   if (!res.ok) throw new Error(`Fetch failed: ${res.status} ${res.statusText}`);
   return await res.text();
 }
