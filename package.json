@@ -17,12 +17,13 @@
   "license": "UNLICENSED",
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "cookie-parser": "^1.4.7",
     "env-paths": "^3.0.0",
     "express": "^5.2.1",
     "express-rate-limit": "^8.2.1",
     "express-session": "^1.18.2",
-    "multer": "^2.0.2",
-    "undici": "^7.18.2"
+    "multer": "^2.0.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

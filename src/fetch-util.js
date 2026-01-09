@@ -9,9 +9,7 @@
 
 function getFetchImpl() {
   if (typeof globalThis.fetch === 'function') return globalThis.fetch.bind(globalThis);
-  const undici = require('undici');
-  if (typeof undici.fetch !== 'function') throw new Error('undici.fetch is not available');
-  return undici.fetch;
+  throw new Error('global fetch is not available; requires Node 18+');
 }
 
 async function fetchWithTimeout(url, init = {}, { timeoutMs = 30_000 } = {}) {
