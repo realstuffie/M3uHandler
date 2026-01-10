@@ -87,7 +87,7 @@ function decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYea
     return path.join('TV Shows', showFolder, seasonFolder, fileName);
   }
 
-  if (type === 'movies') {
+  if (type === 'movie' || type === 'movies') {
     const yearFromTitle = parseYearFromTitle(displayName);
     const yearFromGroup = (() => {
       const m = groupTitle.match(/(\d{4})\b/);

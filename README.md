@@ -18,7 +18,7 @@ CLI tool + GUI to convert an ApolloGroupTV/Starlite style M3U/M3U8 playlist into
 Default output under `output/`:
 
 - TV: `output/TV Shows/<Show (Year)>/Season 01/<Show (Year)> S01E01.strm`
-- Movies: `output/Movies/<Year>/<Movie (Year)>.strm` (or flat with `--movies-flat`)
+- Movies: `output/Movies/<Year>/<Movie (Year)>.strm` (or flat with `--movies-flat`). The `tvg-type` attribute in the M3U file can be `movie` or `movies`.
 - Live (optional): `output/Live/<Group Title>/<Channel Name>.strm`
 
 Each `.strm` file contains the stream URL on a single line.
