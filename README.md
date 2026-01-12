@@ -7,7 +7,7 @@ A command-line utility to process M3U/M3U8 playlists and organize their entries 
 This tool parses a master M3U playlist and categorizes each entry into `Movies`, `TV Shows`, or `Live` streams. It then creates a directory structure and writes individual `.strm` files, which are recognized by many media server applications.
 
 -   Movies are organized by year (e.g., `Movies/2023/My Movie.strm`).
--   TV shows are organized by show name and season (`e.g., TV Shows/My Show/Season 01/S01E01 - Pilot.strm`). Treats the TV shows URL as multiple paginated links.
+-   TV shows are organized by show name and season (e.g., `TV Shows/My Show/Season 01/S01E01 - Pilot.strm`). Treats the TV shows URL as multiple paginated links.
 -   Live streams are typically ignored unless specified.
 
 ## Prerequisites
