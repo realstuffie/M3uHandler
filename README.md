@@ -1,128 +1,53 @@
 # m3uHandler
 
-## Proprietary Notice
+A command-line utility to process M3U/M3U8 playlists and organize their entries into structured `.strm` files for media servers.
 
-Copyright (c) 2026 mooresolutions. All rights reserved.
+## Overview
 
-This project is proprietary. No part of this repository may be copied, modified, published,
-distributed, sublicensed, and/or sold without prior written permission from mooresolutions.
-See `LICENSE`.
+This tool parses a master M3U playlist and categorizes each entry into `Movies`, `TV Shows`, or `Live` streams. It then creates a directory structure and writes individual `.strm` files, which are recognized by many media server applications.
 
----
+-   Movies are organized by year (e.g., `Movies/2023/My Movie.strm`).
+-   TV shows are organized by show name and season (`e.g., TV Shows/My Show/Season 01/S01E01 - Pilot.strm`). Treats the TV shows URL as multiple paginated links.
+-   Live streams are typically ignored unless specified.
 
-CLI tool + GUI to convert an ApolloGroupTV/Starlite style M3U/M3U8 playlist into categorized
-`.strm` files for media libraries.
+## Prerequisites
 
-## Output
+-   Node.js version 18 or higher.
 
-Default output under `output/`:
+## Installation
 
-- TV: `output/TV Shows/<Show (Year)>/Season 01/<Show (Year)> S01E01.strm`
-- Movies: `output/Movies/<Year>/<Movie (Year)>.strm` (or flat with `--movies-flat`). The `tvg-type` attribute in the M3U file can be `movie` or `movies`.
-- Live (optional): `output/Live/<Group Title>/<Channel Name>.strm`
+1.  Clone the repository.
+2.  Install dependencies:
+    ```bash
+    npm install
+    ```
+    *(Note: The project contains a custom `install-deps.js` script, but `npm install` should suffice for standard setups.)*
 
-Each `.strm` file contains the stream URL on a single line.
-
-## Install
-
-Cross-platform (Node.js + npm required):
-
-```bash
-npm run install-deps
-```
-
-Windows bootstrap (best-effort, uses winget if needed):
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts\\windows\\bootstrap.ps1
-```
-
-Linux bootstrap (best-effort, installs Node.js/npm via your package manager if needed):
+## Usage
+This Tool is designed to be used with ApolloGroupTV M3U files, But may work for other providers.
+The primary way to use this tool is via the command-line interface.
 
 ```bash
-bash scripts/linux/bootstrap.sh
+node src/index.js --input <playlist.m3u8> [options]
 ```
 
-Fetch timeout:
+### Options
 
-- `FETCH_TIMEOUT_MS` (default: `30000`) controls HTTP fetch timeout for daemon/GUI URL fetches.
+| Flag                 | Alias | Description                                               | Default     |
+| -------------------- | ----- | --------------------------------------------------------- | ----------- |
+| `--input <file>`     | `-i`  | **Required.** The path to the input M3U/M3U8 playlist file. |             |
+| `--out <dir>`        | `-o`  | The root directory for the generated output folders.      | `output`    |
+| `--include-live`     |       | Also write `.strm` files for live stream entries.         | `false`     |
+| `--overwrite`        |       | Overwrite existing `.strm` files if they already exist.   | `false`     |
+| `--dry-run`          |       | Analyze and report what would be written without saving.  | `false`     |
+| `--movies-flat`      |       | Put movies directly under `Movies/` instead of `Movies/<Year>/`. | `false`   |
+| `--help`             | `-h`  | Display the help message.                                 |             |
 
-## CLI
 
-```bash
-node src/index.js --help
-node src/index.js -i <playlist.m3u8> [-o <outDir>]
-```
+## Available Scripts
 
-Common flags:
+You can use `npm run <script-name>` to execute the following commands:
 
-- `-i, --input <file>`: Input playlist (M3U/M3U8).
-- `-o, --out <dir>`: Output directory (default: `output/`).
-- `--include-live`: Also generate Live `.strm` files under `output/Live/`.
-- `--overwrite`: Overwrite existing `.strm` files.
-- `--dry-run`: Print what would be generated without writing files.
-
-## GUI
-
-Start (localhost):
-
-```bash
-GUI_SESSION_SECRET="$(openssl rand -hex 32)" npm run gui
-```
-
-Windows PowerShell:
-
-```powershell
-$env:GUI_SESSION_SECRET = -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 64 | % {[char]$_})
-npm run gui
-```
-
-LAN (bind all interfaces):
-
-```bash
-GUI_SESSION_SECRET="$(openssl rand -hex 32)" GUI_HOST=0.0.0.0 npm run gui
-```
-
-Windows PowerShell (Admin may be required for firewall rule):
-
-```powershell
-$env:GUI_SESSION_SECRET = -join ((48..57)+(65..90)+(97..122) | Get-Random -Count 64 | % {[char]$_})
-$env:GUI_HOST = "0.0.0.0"
-npm run gui
-```
-
-Open:
-
-- <http://127.0.0.1:5177> (local)
-- <http://your-lan-ip:5177> (LAN)
-
-## Daemon (auto-update from URL)
-
-Run with URL:
-
-```bash
-npm run daemon -- --url "https://example.com/playlist.m3u8" -o ./output
-```
-
-Or save config (keeps URL out of shell history/GUI after first save):
-
-- `~/.config/m3uHandler/config.json`
-
-```bash
-npm run config -- init --url "https://example.com/playlist.m3u8" --out ./output --interval-hours 24
-npm run daemon -- --use-config
-```
-
-Useful options:
-
-```bash
-npm run daemon -- --url "https://example.com/playlist.m3u8" --once
-npm run daemon -- --url "https://example.com/playlist.m3u8" --interval-hours 6
-npm run daemon -- --url "https://example.com/playlist.m3u8" --no-delete-missing
-```
-
-Notes:
-
-- TV paging supported for `.../tvshows` (auto tries `/1..N` until 404, cap=50).
-- Ignored entries are logged to `output/.logs/*-ignored.ndjson`.
-- URL is logged in redacted form (avoid sharing credentialed URLs).
+-   `npm run cli`: The main script to process a playlist. Equivalent to `node src/index.js`.
+-   `npm run daemon`: Runs the application in daemon mode to watch for changes.
+-   `npm run config`: Executes a configuration management script.
