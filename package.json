@@ -12,7 +12,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "UNLICENSED",
+  "license": "GPL-3.0-or-later",
   "dependencies": {},
   "engines": {
     "node": ">=18"
