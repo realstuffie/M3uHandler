@@ -123,6 +123,31 @@ async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, del
 async function main() {
   const args = parseArgs(process.argv);
 
+  // Graceful shutdown handling (Node.js process signal best practice)
+  // - Stop after current run completes
+  // - Exit on second signal (force)
+  let stopRequested = false;
+  let signalCount = 0;
+  const handleSignal = (sig) => {
+    signalCount++;
+    stopRequested = true;
+    const msg = `[${new Date().toISOString()}] received ${sig} (${signalCount}) - ${signalCount >= 2 ? 'forcing exit' : 'will stop after current cycle'}`;
+    console.error(msg);
+    if (signalCount >= 2) process.exit(1);
+  };
+  process.on('SIGINT', handleSignal);
+  process.on('SIGTERM', handleSignal);
+
+  // Avoid leaking stack traces via unhandled promise rejections in daemon mode; log and request stop.
+  process.on('unhandledRejection', (reason) => {
+    stopRequested = true;
+    console.error(`[${new Date().toISOString()}] unhandledRejection:`, reason);
+  });
+  process.on('uncaughtException', (err) => {
+    stopRequested = true;
+    console.error(`[${new Date().toISOString()}] uncaughtException:`, err?.stack || String(err));
+  });
+
   let cfg = null;
   if (args.useConfig) {
     const { loadConfig, CONFIG_PATH } = require('./plain-config');
@@ -204,9 +229,17 @@ Delete missing: ${args.deleteMissing}`);
       }
     }
 
-    if (args.once) break;
-    await sleep(intervalSeconds * 1000);
-  } while (true);
+    if (args.once || stopRequested) break;
+
+    // Sleep in smaller chunks so shutdown signals are respected quickly.
+    const sleepChunkMs = 1000;
+    let remainingMs = intervalSeconds * 1000;
+    while (remainingMs > 0 && !stopRequested) {
+      const ms = Math.min(sleepChunkMs, remainingMs);
+      await sleep(ms);
+      remainingMs -= ms;
+    }
+  } while (!stopRequested);
 }
 
 main().catch((err) => {
