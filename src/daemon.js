@@ -97,7 +97,7 @@ function sanitizeLogMessage(msg, secrets = []) {
   return s;
 }
 
-async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, deleteMissing }) {
+async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, deleteMissing, defaultType = null }) {
   const tmp = path.join(os.tmpdir(), `m3uHandler-${Date.now()}-${Math.random().toString(16).slice(2)}.m3u8`);
   try {
     const text = await fetchText(url);
@@ -111,6 +111,7 @@ async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, del
       moviesByYear,
       deleteMissing,
       dryRun: false,
+      defaultType,
     });
 
     return stats;
@@ -133,8 +134,10 @@ async function main() {
   }
 
   const finalUrl = cfg?.url || args.url;
+  const finalUrlTv = cfg?.urlTv || null;
+  const finalUrlMovies = cfg?.urlMovies || null;
 
-  if (args.help || !finalUrl) {
+  if (args.help || (!finalUrl && !finalUrlTv && !finalUrlMovies)) {
     console.log(usage());
     process.exitCode = args.help ? 0 : 1;
     return;
@@ -148,15 +151,22 @@ async function main() {
   const moviesByYear = cfg?.moviesFlat ? false : args.moviesByYear;
   const intervalSeconds = Number.isFinite(cfg?.intervalHours) ? cfg.intervalHours * 60 * 60 : args.intervalSeconds;
 
-  const safeUrl = redactUrl(finalUrl);
-  const secrets = (() => {
+  const urlsToRun = [];
+  if (finalUrl) urlsToRun.push({ label: 'playlist', url: finalUrl, defaultType: null });
+  if (finalUrlTv) urlsToRun.push({ label: 'tv', url: finalUrlTv, defaultType: 'tvshows' });
+  if (finalUrlMovies) urlsToRun.push({ label: 'movies', url: finalUrlMovies, defaultType: 'movies' });
+
+  // Collect secrets from all URLs for log redaction
+  const secrets = [];
+  for (const uStr of urlsToRun.map((x) => x.url)) {
     try {
-      const u = new URL(finalUrl);
-      return [u.username, u.password].filter(Boolean);
-    } catch {
-      return [];
-    }
-  })();
+      const u = new URL(uStr);
+      if (u.username) secrets.push(u.username);
+      if (u.password) secrets.push(u.password);
+    } catch {}
+  }
+
+  const safeUrl = urlsToRun.map((x) => `${x.label}=${redactUrl(x.url)}`).join(' ');
 
   console.log(`m3uHandler daemon started
 URL: ${safeUrl}
@@ -166,23 +176,32 @@ Delete missing: ${args.deleteMissing}`);
 
   do {
     const started = new Date();
-    try {
-      console.log(`[${started.toISOString()}] updating...`);
-      const stats = await runOnce({
-        url: finalUrl,
-        outRoot,
-        includeLive,
-        overwrite: args.overwrite,
-        moviesByYear,
-        deleteMissing: args.deleteMissing,
-      });
-      console.log(
-        `[${new Date().toISOString()}] done. written=${stats.written} skipped=${stats.skipped} ignored=${stats.ignored} deleted=${stats.deleted}`
-      );
-    } catch (e) {
-      console.error(
-        `[${new Date().toISOString()}] update failed: ${sanitizeLogMessage(String(e?.stack || e), secrets)}`
-      );
+    console.log(`[${started.toISOString()}] updating...`);
+
+    // Run sequentially to avoid heavy concurrent I/O (helps overall system responsiveness)
+    // Only deleteMissing on the *final* run of the batch, otherwise the first run could delete
+    // files that the second run will re-create.
+    for (let i = 0; i < urlsToRun.length; i++) {
+      const { label, url, defaultType } = urlsToRun[i];
+      const isLast = i === urlsToRun.length - 1;
+      try {
+        const stats = await runOnce({
+          url,
+          outRoot,
+          includeLive,
+          overwrite: args.overwrite,
+          moviesByYear,
+          deleteMissing: args.deleteMissing && isLast,
+          defaultType,
+        });
+        console.log(
+          `[${new Date().toISOString()}] ${label} done. written=${stats.written} skipped=${stats.skipped} ignored=${stats.ignored} deleted=${stats.deleted}`
+        );
+      } catch (e) {
+        console.error(
+          `[${new Date().toISOString()}] ${label} failed: ${sanitizeLogMessage(String(e?.stack || e), secrets)}`
+        );
+      }
     }
 
     if (args.once) break;
@@ -194,4 +213,3 @@ main().catch((err) => {
   console.error(err?.stack || String(err));
   process.exitCode = 1;
 });
-

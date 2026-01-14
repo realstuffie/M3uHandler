@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const test = require('node:test');
+const assert = require('node:assert/strict');
 const { convertM3U } = require('../src/convert');
 
 function makeTempDir() {
@@ -14,6 +16,8 @@ const SAMPLE = `#EXTM3U
 https://starlite.best/api/stream/user/pass/movie/tt37443891
 #EXTINF:-1 tvg-id="tt33501959" tvg-name="tt33501959" tvg-type="tvshows" group-title="Land of Sin (2026)" ,Land of Sin (2026) S01 E01
 https://starlite.best/api/stream/user/pass/tvshow/tt33501959/1/1
+#EXTINF:-1 tvg-id="tt22091076" tvg-name="tt22091076" tvg-type="tvshows" group-title="High Potential (2024)" ,High Potential (2024) S02 E01
+https://starlite.best/api/stream/user/pass/tvshow/tt22091076/2/1
 #EXTINF:-1 tvg-id="5.star.max.eastern.us" tvg-name="5.star.max.eastern.us" tvg-type="live" group-title="US" tvg-logo="https://media.starlite.best/5.star.max.eastern.us.png",5 Star Max (East)
 https://starlite.best/api/stream/user/pass/livetv.epg/5.star.max.eastern.us.m3u8
 `;
@@ -34,9 +38,9 @@ test('generate movie+tv and ignore live when includeLive=false (dry-run)', async
     ignoredLogPath: path.join(dir, '.logs', 'ignored.ndjson'),
   });
 
-  expect(res.stats.written).toBe(2);
-  expect(res.stats.ignored).toBe(1);
-  expect(res.lastWritten).toBeTruthy();
+  assert.equal(res.stats.written, 3);
+  assert.equal(res.stats.ignored, 1);
+  assert.ok(res.lastWritten);
 });
 
 test('generate movie+tv+live when includeLive=true (dry-run)', async () => {
@@ -55,7 +59,7 @@ test('generate movie+tv+live when includeLive=true (dry-run)', async () => {
     ignoredLogPath: path.join(dir, '.logs', 'ignored.ndjson'),
   });
 
-  expect(res.stats.written).toBe(3);
-  expect(res.stats.ignored).toBe(0);
-  expect(res.lastWritten).toBeTruthy();
+  assert.equal(res.stats.written, 4);
+  assert.equal(res.stats.ignored, 0);
+  assert.ok(res.lastWritten);
 });

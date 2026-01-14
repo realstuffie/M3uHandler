@@ -45,9 +45,14 @@ function parseYearFromTitle(title) {
 }
 
 function parseShowTitleAndEpisode(displayName, fallbackGroupTitle) {
-  const episodeMatch = displayName.match(/\bS(\d{1,2})\s*E(\d{1,2})\b/i);
-  // Also accept "S01 E101" (space-separated) which some providers use
-  const episodeMatch2 = episodeMatch ? null : displayName.match(/\bS(\d{1,2})\s+E(\d{1,3})\b/i);
+  // Accept common patterns:
+  // - "S01E02"
+  // - "S01 E02"
+  // - "S01 E102" (some providers use 3-digit episode numbers)
+  // Current provider example: "High Potential (2024) S02 E01"
+  const episodeMatch = displayName.match(/\bS(\d{1,2})\s*E(\d{1,3})\b/i);
+  // Some providers format as "Season 2 Episode 1"
+  const episodeMatch2 = episodeMatch ? null : displayName.match(/\bSeason\s*(\d{1,2})\s*(?:Episode|Ep)\s*(\d{1,3})\b/i);
   const m = episodeMatch || episodeMatch2;
   const season = m ? String(parseInt(m[1], 10)).padStart(2, '0') : null;
   const episode = m ? String(parseInt(m[2], 10)).padStart(2, '0') : null;
@@ -55,7 +60,7 @@ function parseShowTitleAndEpisode(displayName, fallbackGroupTitle) {
   const baseFromGroup = fallbackGroupTitle && fallbackGroupTitle.match(/\(\d{4}\)\s*$/) ? fallbackGroupTitle : null;
 
   let showBase = baseFromGroup;
-  if (!showBase) showBase = displayName.replace(/\bS\d{1,2}\s*E\d{1,2}\b/i, '').trim();
+  if (!showBase) showBase = displayName.replace(/\bS\d{1,2}\s*E\d{1,3}\b/i, '').trim();
 
   const kodiEpisodeTag = season && episode ? `S${season}E${episode}` : null;
 
@@ -126,8 +131,10 @@ async function convertM3U({
     throw err;
   }
 
+  const inputStream = fs.createReadStream(inputPath, { encoding: 'utf8' });
+
   const rl = readline.createInterface({
-    input: fs.createReadStream(inputPath, { encoding: 'utf8' }),
+    input: inputStream,
     crlfDelay: Infinity,
   });
 
@@ -144,70 +151,80 @@ async function convertM3U({
 
   const expectedRelPaths = deleteMissing ? new Set() : null;
 
-  for await (const rawLine of rl) {
-    const line = rawLine.trim();
-    if (!line) continue;
+  try {
+    for await (const rawLine of rl) {
+      const line = rawLine.trim();
+      if (!line) continue;
 
-    if (line.startsWith('#EXTINF:')) {
-      pendingExtinf = line;
-      continue;
-    }
-
-    if (line.startsWith('#')) continue;
-
-    if (!pendingExtinf) {
-      stats.ignored++;
-      continue;
-    }
-
-    const url = line;
-    const { attrs, displayName } = parseExtinf(pendingExtinf);
-    pendingExtinf = null;
-
-    const rel = decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYear, defaultType });
-    if (!rel) {
-      stats.ignored++;
-      if (ignoredStream) {
-        const tvgType = attrs['tvg-type'] || '';
-        const groupTitle = attrs['group-title'] || '';
-        const tvgName = attrs['tvg-name'] || '';
-        ignoredStream.write(
-          JSON.stringify(
-            {
-              displayName,
-              tvgType,
-              groupTitle,
-              tvgName,
-              url,
-              reason: 'No output path (unmatched type or missing SxxEyy for tvshows)',
-            },
-            null,
-            0
-          ) + '\n'
-        );
+      if (line.startsWith('#EXTINF:')) {
+        pendingExtinf = line;
+        continue;
       }
-      continue;
+
+      if (line.startsWith('#')) continue;
+
+      if (!pendingExtinf) {
+        stats.ignored++;
+        continue;
+      }
+
+      const url = line;
+      const { attrs, displayName } = parseExtinf(pendingExtinf);
+      pendingExtinf = null;
+
+      const rel = decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYear, defaultType });
+      if (!rel) {
+        stats.ignored++;
+        if (ignoredStream) {
+          const tvgType = attrs['tvg-type'] || '';
+          const groupTitle = attrs['group-title'] || '';
+          const tvgName = attrs['tvg-name'] || '';
+          ignoredStream.write(
+            JSON.stringify(
+              {
+                displayName,
+                tvgType,
+                groupTitle,
+                tvgName,
+                url,
+                reason: 'No output path (unmatched type or missing SxxEyy for tvshows)',
+              },
+              null,
+              0
+            ) + '\n'
+          );
+        }
+        continue;
+      }
+
+      const outPath = path.join(outRoot, rel);
+      if (expectedRelPaths) expectedRelPaths.add(rel);
+      const outDir = path.dirname(outPath);
+
+      if (dryRun) {
+        stats.written++;
+        lastWritten = { outPath, url };
+        continue;
+      }
+
+      ensureDirSync(outDir, dryRun);
+      const res = writeFileSyncSafe(outPath, url + '\n', { overwrite, dryRun });
+
+      if (res.action === 'written') {
+        stats.written++;
+        lastWritten = { outPath, url };
+      } else if (res.action === 'skipped-exists') {
+        stats.skipped++;
+      }
     }
-
-    const outPath = path.join(outRoot, rel);
-    if (expectedRelPaths) expectedRelPaths.add(rel);
-    const outDir = path.dirname(outPath);
-
-    if (dryRun) {
-      stats.written++;
-      lastWritten = { outPath, url };
-      continue;
-    }
-
-    ensureDirSync(outDir, dryRun);
-    const res = writeFileSyncSafe(outPath, url + '\n', { overwrite, dryRun });
-
-    if (res.action === 'written') {
-      stats.written++;
-      lastWritten = { outPath, url };
-    } else if (res.action === 'skipped-exists') {
-      stats.skipped++;
-    }
+  } finally {
+    // Best-effort cleanup: ensures file descriptors are released even if an error occurs mid-conversion.
+    try {
+      rl.close();
+    } catch {}
+    try {
+      inputStream.destroy();
+    } catch {}
   }
 
   if (ignoredStream) {
@@ -217,6 +234,31 @@ async function convertM3U({
   if (deleteMissing && expectedRelPaths) {
     // Delete .strm files under known roots that are not present in the current playlist.
     const roots = ['TV Shows', 'Movies', 'Live'].map((r) => path.join(outRoot, r));
+    const MAX_CONCURRENCY = Number(process.env.DELETE_CONCURRENCY || 64);
+
+    // Simple concurrency limiter (avoid spawning hundreds of thousands of pending promises)
+    const limit = (() => {
+      let active = 0;
+      const queue = [];
+      const runNext = () => {
+        while (active < MAX_CONCURRENCY && queue.length) {
+          const { fn, resolve, reject } = queue.shift();
+          active++;
+          Promise.resolve()
+            .then(fn)
+            .then(resolve, reject)
+            .finally(() => {
+              active--;
+              runNext();
+            });
+        }
+      };
+      return (fn) =>
+        new Promise((resolve, reject) => {
+          queue.push({ fn, resolve, reject });
+          runNext();
+        });
+    })();
 
     const walk = async (dir) => {
       let entries;
@@ -226,27 +268,31 @@ async function convertM3U({
         return;
       }
 
-      await Promise.all(
-        entries.map(async (ent) => {
-          const full = path.join(dir, ent.name);
-          if (ent.isDirectory()) {
-            await walk(full);
-            // Best-effort: remove empty dirs after deletions
+      // Keep directory traversal sequential-ish; limit concurrency on the heavy work (unlink / rm)
+      for (const ent of entries) {
+        const full = path.join(dir, ent.name);
+        if (ent.isDirectory()) {
+          await walk(full);
+
+          // Best-effort: remove empty dirs after deletions
+          await limit(async () => {
             try {
               const remaining = await fs.promises.readdir(full);
               if (remaining.length === 0) await fs.promises.rm(full, { recursive: true, force: true });
             } catch {}
-          } else if (ent.isFile() && ent.name.toLowerCase().endsWith('.strm')) {
-            const relFromOut = path.relative(outRoot, full);
-            if (!expectedRelPaths.has(relFromOut)) {
+          });
+        } else if (ent.isFile() && ent.name.toLowerCase().endsWith('.strm')) {
+          const relFromOut = path.relative(outRoot, full);
+          if (!expectedRelPaths.has(relFromOut)) {
+            await limit(async () => {
               try {
                 await fs.promises.unlink(full);
                 stats.deleted++;
               } catch {}
-            }
+            });
           }
-        })
-      );
+        }
+      }
     };
 
     for (const r of roots) await walk(r);
