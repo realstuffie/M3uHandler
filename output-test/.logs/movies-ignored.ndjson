@@ -1,3 +1,0 @@
-
-# ---- run 2026-01-11T00:30:08.986Z input=sample.m3u8 ----
-{"displayName":"5 Star Max (East)","tvgType":"live","groupTitle":"US","tvgName":"5.star.max.eastern.us","url":"https://starlite.best/api/stream/user/pass/livetv.epg/5.star.max.eastern.us.m3u8","reason":"No output path (unmatched type or missing SxxEyy for tvshows)"}
