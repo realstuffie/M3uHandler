@@ -26,6 +26,19 @@ npm install
 
 *(Note: there is an `npm run install-deps` helper script, but `npm install` is enough for standard setups.)*
 
+## Logging
+
+All CLIs write logs to both the console and a log file.
+
+- Default log path: `output/m3uHandler.log`
+- Override via environment variable: `M3UHANDLER_LOG_PATH`
+
+Example:
+
+```bash
+M3UHANDLER_LOG_PATH="output/custom.log" node src/daemon.js --url "<m3u_url>" --once
+```
+
 ## Usage
 
 This tool is designed to be used with ApolloGroupTV M3U files, but may work for other providers.
@@ -95,20 +108,20 @@ The script parses `Title (Year)` from the folder name, uses Radarr’s lookup en
 
 Set environment variables:
 
-- `RADARR_URL` (example: `http://192.168.80.42:7878`)
+- `RADARR_URL` (example: `http://[your local radarr ip]:7878`)
 - `RADARR_API_KEY` (Radarr → Settings → General → Security)
 
 Dry-run (no API calls to add movies):
 
 ```bash
-RADARR_URL="http://192.168.80.42:7878" RADARR_API_KEY="..." \
+RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
   npm run radarr-adopt -- --library-path "/mnt/share/Emby/Movies/Movies" --root-folder "/mnt/share/Emby/Movies/Movies" --dry-run
 ```
 
 Actual import (batch size 1000):
 
 ```bash
-RADARR_URL="http://192.168.80.42:7878" RADARR_API_KEY="..." \
+RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
   npm run radarr-adopt -- --library-path "/mnt/share/Emby/Movies/Movies" --root-folder "/mnt/share/Emby/Movies/Movies" --batch-size 1000
 ```
 

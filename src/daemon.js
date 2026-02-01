@@ -9,6 +9,7 @@ const path = require('path');
 const { setTimeout: sleep } = require('timers/promises');
 const { convertM3U } = require('./convert');
 const { fetchWithTimeout } = require('./fetch-util');
+const { makeLogger, installProcessHandlers } = require('./logger');
 
 const DEFAULT_TIMEOUT_MS = Number(process.env.FETCH_TIMEOUT_MS || 30000);
 
@@ -79,10 +80,20 @@ Options:
 function redactUrl(u) {
   try {
     const url = new URL(u);
+
+    // Mask credentials
     if (url.username || url.password) {
       url.username = url.username ? '***' : '';
       url.password = url.password ? '***' : '';
     }
+
+    // Avoid leaking tokens/keys in query strings in logs.
+    // Keep only a short allowlist of "harmless" keys; drop the rest.
+    const allow = new Set(['type', 'profile', 'quality', 'format']);
+    for (const k of Array.from(url.searchParams.keys())) {
+      if (!allow.has(k.toLowerCase())) url.searchParams.set(k, '***');
+    }
+
     return url.toString();
   } catch {
     return '<invalid-url>';
@@ -130,6 +141,8 @@ async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, mov
 async function main() {
   const args = parseArgs(process.argv);
 
+  const logger = makeLogger();
+
   // Graceful shutdown handling (Node.js process signal best practice)
   // - Stop after current run completes
   // - Exit on second signal (force)
@@ -138,21 +151,24 @@ async function main() {
   const handleSignal = (sig) => {
     signalCount++;
     stopRequested = true;
-    const msg = `[${new Date().toISOString()}] received ${sig} (${signalCount}) - ${signalCount >= 2 ? 'forcing exit' : 'will stop after current cycle'}`;
-    console.error(msg);
+    const msg = `[${new Date().toISOString()}] received ${sig} (${signalCount}) - ${
+      signalCount >= 2 ? 'forcing exit' : 'will stop after current cycle'
+    }`;
+    logger.warn(msg);
     if (signalCount >= 2) process.exit(1);
   };
   process.on('SIGINT', handleSignal);
   process.on('SIGTERM', handleSignal);
 
-  // Avoid leaking stack traces via unhandled promise rejections in daemon mode; log and request stop.
-  process.on('unhandledRejection', (reason) => {
-    stopRequested = true;
-    console.error(`[${new Date().toISOString()}] unhandledRejection:`, reason);
-  });
-  process.on('uncaughtException', (err) => {
-    stopRequested = true;
-    console.error(`[${new Date().toISOString()}] uncaughtException:`, err?.stack || String(err));
+  installProcessHandlers(logger, {
+    // Daemon should attempt to stop cleanly rather than hard-exit on first crash.
+    exitOnUncaughtException: false,
+    onUnhandledRejection: () => {
+      stopRequested = true;
+    },
+    onUncaughtException: () => {
+      stopRequested = true;
+    },
   });
 
   let cfg = null;
@@ -160,7 +176,7 @@ async function main() {
     const { loadConfig, CONFIG_PATH } = require('./plain-config');
     cfg = loadConfig();
     if (!cfg) {
-      console.error(`No config found at ${CONFIG_PATH}. Create one with: node src/config.js init --url \"...\"`);
+      logger.error(`No config found at ${CONFIG_PATH}. Create one with: node src/config.js init --url \"...\"`);
       process.exit(1);
     }
   }
@@ -201,15 +217,16 @@ async function main() {
 
   const safeUrl = urlsToRun.map((x) => `${x.label}=${redactUrl(x.url)}`).join(' ');
 
-  console.log(`m3uHandler daemon started
+  logger.info(`m3uHandler daemon started
 URL: ${safeUrl}
 Output: ${outRoot}
 Interval: ${intervalSeconds}s
-Delete missing: ${args.deleteMissing}`);
+Delete missing: ${args.deleteMissing}
+Log: ${logger.logPath}`);
 
   do {
     const started = new Date();
-    console.log(`[${started.toISOString()}] updating...`);
+    logger.info(`[${started.toISOString()}] updating...`);
 
     // Run sequentially to avoid heavy concurrent I/O (helps overall system responsiveness)
     // Only deleteMissing on the *final* run of the batch, otherwise the first run could delete
@@ -228,11 +245,11 @@ Delete missing: ${args.deleteMissing}`);
           deleteMissing: args.deleteMissing && isLast,
           defaultType,
         });
-        console.log(
+        logger.info(
           `[${new Date().toISOString()}] ${label} done. written=${stats.written} skipped=${stats.skipped} ignored=${stats.ignored} deleted=${stats.deleted}`
         );
       } catch (e) {
-        console.error(
+        logger.error(
           `[${new Date().toISOString()}] ${label} failed: ${sanitizeLogMessage(String(e?.stack || e), secrets)}`
         );
       }
@@ -252,6 +269,7 @@ Delete missing: ${args.deleteMissing}`);
 }
 
 main().catch((err) => {
-  console.error(err?.stack || String(err));
+  const logger = makeLogger();
+  logger.error(err?.stack || String(err));
   process.exitCode = 1;
 });

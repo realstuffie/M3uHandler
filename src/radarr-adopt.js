@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const https = require('https');
+const { makeLogger, installProcessHandlers, formatError } = require('./logger');
 
 /**
  * Minimal Radarr bulk-adopt tool:
@@ -134,7 +135,7 @@ function requestJson({ baseUrl, apiKey, method, pathname, query, body, timeoutMs
   });
 }
 
-async function withRetries(fn, { retries = 5, baseDelayMs = 500, maxDelayMs = 10000 } = {}) {
+async function withRetries(fn, { retries = 5, baseDelayMs = 500, maxDelayMs = 10000, logger } = {}) {
   let attempt = 0;
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -148,8 +149,8 @@ async function withRetries(fn, { retries = 5, baseDelayMs = 500, maxDelayMs = 10
       if (!retryable || attempt > retries) throw e;
 
       const delay = Math.min(maxDelayMs, baseDelayMs * Math.pow(2, attempt - 1));
-      // eslint-disable-next-line no-console
-      console.warn(`Retrying after error (attempt ${attempt}/${retries}, delay ${delay}ms): ${e.message}`);
+      const warn = logger ? logger.warn.bind(logger) : console.warn.bind(console);
+      warn(`Retrying after error (attempt ${attempt}/${retries}, delay ${delay}ms): ${e.message}`);
       await sleep(delay);
     }
   }
@@ -177,11 +178,11 @@ function indexMoviesByTmdbId(movies) {
   return byTmdbId;
 }
 
-async function lookupMovie({ baseUrl, apiKey, title, year }) {
+async function lookupMovie({ baseUrl, apiKey, title, year, logger }) {
   const term = year ? `${title} ${year}` : title;
   const results = await withRetries(
     () => requestJson({ baseUrl, apiKey, method: 'GET', pathname: '/api/v3/movie/lookup', query: { term } }),
-    {}
+    { logger }
   );
 
   // Prefer exact year match if present.
@@ -206,11 +207,11 @@ function isMovieAlreadyExistsError(err) {
   return parsed.some((e) => e && (e.errorCode === 'MovieExistsValidator' || /already been added/i.test(e.errorMessage || '')));
 }
 
-async function addMovie({ baseUrl, apiKey, movie }) {
+async function addMovie({ baseUrl, apiKey, movie, logger }) {
   // Radarr expects a single MovieResource per POST to /api/v3/movie.
   // (Bulk add uses /api/v3/movie/import on some versions; to keep this tool compatible,
   // we POST individual movies with bounded concurrency at a higher level.)
-  return withRetries(() => requestJson({ baseUrl, apiKey, method: 'POST', pathname: '/api/v3/movie', body: movie }), {});
+  return withRetries(() => requestJson({ baseUrl, apiKey, method: 'POST', pathname: '/api/v3/movie', body: movie }), { logger });
 }
 
 async function adoptLibrary({
@@ -227,14 +228,16 @@ async function adoptLibrary({
   statePath = path.join('output', 'radarr-adopt-state.json'),
   cachePath = path.join('output', 'radarr-lookup-cache.json'),
 }) {
+  const logger = makeLogger();
+  installProcessHandlers(logger, { exitOnUncaughtException: false });
+
   const absLibraryPath = path.resolve(libraryPath);
 
   const state = readJsonFileSafe(statePath, { addedPaths: {} });
   const lookupCache = readJsonFileSafe(cachePath, {});
 
   const logStage = (msg) => {
-    // eslint-disable-next-line no-console
-    console.log(`\n==> ${msg}`);
+    logger.info(`\n==> ${msg}`);
   };
 
   const logProgress = ({ label, current, total, every = 250 }) => {
@@ -242,23 +245,18 @@ async function adoptLibrary({
     if (current === 0) return;
     if (current % every !== 0 && current !== total) return;
     const pct = ((current / total) * 100).toFixed(1);
-    // eslint-disable-next-line no-console
-    console.log(`${label}: ${current}/${total} (${pct}%)`);
+    logger.info(`${label}: ${current}/${total} (${pct}%)`);
   };
 
   logStage('Configuration');
-  // eslint-disable-next-line no-console
-  console.log(`Library path: ${absLibraryPath}`);
-  // eslint-disable-next-line no-console
-  console.log(`Radarr rootFolderPath: ${rootFolderPath}`);
-  // eslint-disable-next-line no-console
-  console.log(
+  logger.info(`Library path: ${absLibraryPath}`);
+  logger.info(`Radarr rootFolderPath: ${rootFolderPath}`);
+  logger.info(
     `Batch size: ${batchSize} | monitored=${monitored} | searchForMovie=${searchForMovie} | dryRun=${dryRun} | lookupConcurrency=${lookupConcurrency} | addConcurrency=${addConcurrency}`
   );
-  // eslint-disable-next-line no-console
-  console.log(`State: ${statePath}`);
-  // eslint-disable-next-line no-console
-  console.log(`Lookup cache: ${cachePath}`);
+  logger.info(`State: ${statePath}`);
+  logger.info(`Lookup cache: ${cachePath}`);
+  logger.info(`Log: ${logger.logPath}`);
 
   logStage(dryRun ? 'Dry-run mode: will not call Radarr APIs (scan only)' : 'Loading existing movies from Radarr');
   const existingMovies = dryRun ? [] : await listExistingMovies({ baseUrl, apiKey });
@@ -266,8 +264,7 @@ async function adoptLibrary({
   const existingByTmdbId = indexMoviesByTmdbId(existingMovies);
 
   if (!dryRun) {
-    // eslint-disable-next-line no-console
-    console.log(`Loaded ${existingMovies.length} existing movies from Radarr.`);
+    logger.info(`Loaded ${existingMovies.length} existing movies from Radarr.`);
   }
 
   logStage('Scanning library root for "Title (Year)" folders');
@@ -294,8 +291,7 @@ async function adoptLibrary({
     logProgress({ label: 'Scan progress (directories)', current: scannedDirs, total: entries.length, every: 500 });
   }
 
-  // eslint-disable-next-line no-console
-  console.log(`Found ${candidates.length} candidate movie folders to add.`);
+  logger.info(`Found ${candidates.length} candidate movie folders to add.`);
 
   logStage(
     dryRun
@@ -322,7 +318,7 @@ async function adoptLibrary({
   if (!dryRun && missing.length) {
     let done = 0;
     await mapConcurrent(missing, lookupConcurrency, async ({ c, cacheKey }) => {
-      const lookup = await lookupMovie({ baseUrl, apiKey, title: c.title, year: c.year });
+      const lookup = await lookupMovie({ baseUrl, apiKey, title: c.title, year: c.year, logger });
       lookupCache[cacheKey] = lookup ? { tmdbId: lookup.tmdbId, title: lookup.title, year: lookup.year } : null;
 
       done++;
@@ -372,8 +368,7 @@ async function adoptLibrary({
 
   writeJsonAtomic(cachePath, lookupCache);
 
-  // eslint-disable-next-line no-console
-  console.log(`Prepared ${toAdd.length} movies to add (lookups: ${lookedUp}, cache hits: ${skippedLookup}).`);
+  logger.info(`Prepared ${toAdd.length} movies to add (lookups: ${lookedUp}, cache hits: ${skippedLookup}).`);
 
   const batches = chunk(toAdd, batchSize);
 
@@ -400,7 +395,7 @@ async function adoptLibrary({
 
     await mapConcurrent(toAdd, addConcurrency, async (movie, idx) => {
       try {
-        const res = await addMovie({ baseUrl, apiKey, movie });
+        const res = await addMovie({ baseUrl, apiKey, movie, logger });
 
         // Update indexes to reduce chances of duplicates during the same run
         if (res && res.tmdbId != null) existingByTmdbId.set(Number(res.tmdbId), res);
@@ -425,16 +420,16 @@ async function adoptLibrary({
           }
         } else {
           failed++;
-          // eslint-disable-next-line no-console
-          console.error(`Failed to add: ${movie && movie.path ? movie.path : '(unknown path)'} :: ${e.message}`);
+          logger.error(
+            `Failed to add: ${movie && movie.path ? movie.path : '(unknown path)'} :: ${formatError(e)}`
+          );
         }
       } finally {
         doneMovies++;
         addedCount++;
         logProgress({ label: 'Add progress (movies)', current: doneMovies, total: toAdd.length, every: 100 });
         if (doneMovies % 500 === 0 || doneMovies === toAdd.length) {
-          // eslint-disable-next-line no-console
-          console.log(`Added so far: ${doneMovies}/${toAdd.length} (skippedExists=${skippedExists}, failed=${failed})`);
+          logger.info(`Added so far: ${doneMovies}/${toAdd.length} (skippedExists=${skippedExists}, failed=${failed})`);
         }
       }
 
@@ -527,12 +522,12 @@ if (require.main === module) {
       cachePath,
     })
       .then((res) => {
-        // eslint-disable-next-line no-console
-        console.log(`Done. candidates=${res.candidates} prepared=${res.prepared} added=${res.added}`);
+        const logger = makeLogger();
+        logger.info(`Done. candidates=${res.candidates} prepared=${res.prepared} added=${res.added}`);
       })
       .catch((e) => {
-        // eslint-disable-next-line no-console
-        console.error(e && e.stack ? e.stack : String(e));
+        const logger = makeLogger();
+        logger.error(formatError(e));
         process.exitCode = 1;
       });
   }

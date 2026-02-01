@@ -7,6 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
+const { makeLogger, installProcessHandlers, formatError } = require('./logger');
+
 /**
  * Parse EXTINF line into attrs and displayName
  * Mirrors logic from src/convert.js to keep behavior consistent.
@@ -125,6 +127,9 @@ module.exports = { generateRadarrTmdbListCsv };
  *  node src/radarr-csv.js --input playlist.m3u --output output/radarr.csv [--default-year 2024]
  */
 if (require.main === module) {
+  const logger = makeLogger();
+  installProcessHandlers(logger, { exitOnUncaughtException: true });
+
   const args = process.argv.slice(2);
   const getArg = (name) => {
     const idx = args.indexOf(name);
@@ -137,18 +142,18 @@ if (require.main === module) {
   const defaultYear = getArg('--default-year') || '';
 
   if (!inputPath) {
-    // eslint-disable-next-line no-console
-    console.error('Missing --input. Example: node src/radarr-csv.js --input playlist.m3u --output output/radarr.csv');
+    logger.error(
+      'Missing --input. Example: node src/radarr-csv.js --input playlist.m3u --output output/radarr.csv',
+    );
     process.exitCode = 2;
   } else {
+    logger.info(`Generating Radarr CSV... Log: ${logger.logPath}`);
     generateRadarrTmdbListCsv({ inputPath, outputPath, defaultYear })
       .then((res) => {
-        // eslint-disable-next-line no-console
-        console.log(`Wrote Radarr CSV (${res.rows} movies): ${res.outputPath}`);
+        logger.info(`Wrote Radarr CSV (${res.rows} movies): ${res.outputPath}`);
       })
       .catch((e) => {
-        // eslint-disable-next-line no-console
-        console.error(e && e.stack ? e.stack : String(e));
+        logger.error(`Failed to generate Radarr CSV: ${formatError(e)}`);
         process.exitCode = 1;
       });
   }
