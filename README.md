@@ -59,10 +59,71 @@ node src/daemon.js --url "<m3u_url>" [options]
 | `--once`                 | Run one update and exit | `false` |
 | `--help` | `-h`          | Show help
 
+## Radarr CSV export (TMDb List CSV)
+
+This repo now includes a helper script to generate a Radarr-compatible CSV for **Settings → Lists → + → TMDb List → “Import List” (CSV)**.
+
+It outputs:
+
+- `Title`
+- `Year`
+- `TmdbId` (blank, since M3U playlists typically don’t provide it)
+
+### Generate CSV
+
+```bash
+npm run radarr-csv -- --input /path/to/playlist.m3u --output output/radarr.csv
+```
+
+Optional: if the playlist does not include years in titles, you can set a default year:
+
+```bash
+npm run radarr-csv -- --input /path/to/playlist.m3u --output output/radarr.csv --default-year 2024
+```
+
+## Radarr bulk adopt (bypass GUI import)
+
+If Radarr’s GUI “Library Import” errors out on very large libraries, you can bulk-add (“adopt”) existing movie folders via the Radarr API in batches.
+
+This expects a folder layout like:
+
+- `/mnt/share/Emby/Movies/Movies/Movie Title (2010)/...` (folder per movie)
+
+The script parses `Title (Year)` from the folder name, uses Radarr’s lookup endpoint to resolve the TMDb ID, then POSTs to Radarr in batches (default: **1000**).
+
+### Run
+
+Set environment variables:
+
+- `RADARR_URL` (example: `http://192.168.80.42:7878`)
+- `RADARR_API_KEY` (Radarr → Settings → General → Security)
+
+Dry-run (no API calls to add movies):
+
+```bash
+RADARR_URL="http://192.168.80.42:7878" RADARR_API_KEY="..." \
+  npm run radarr-adopt -- --library-path "/mnt/share/Emby/Movies/Movies" --root-folder "/mnt/share/Emby/Movies/Movies" --dry-run
+```
+
+Actual import (batch size 1000):
+
+```bash
+RADARR_URL="http://192.168.80.42:7878" RADARR_API_KEY="..." \
+  npm run radarr-adopt -- --library-path "/mnt/share/Emby/Movies/Movies" --root-folder "/mnt/share/Emby/Movies/Movies" --batch-size 1000
+```
+
+Notes:
+
+- The `--root-folder` value **must** match a configured Radarr root folder.
+- The script defaults to `monitored=true` and does **not** trigger automatic searching/downloading unless you pass `--search`.
+- Resume support: state is written to `output/radarr-adopt-state.json` so you can re-run and it will skip already-added paths.
+
 ## Available Scripts
 
 You can use `npm run <script-name>` to execute the following commands:
 
 - `npm run daemon`: Runs the daemon CLI (`node src/daemon.js`).
+- `npm run radarr-csv`: Generates a Radarr TMDb List import CSV from an M3U file (`node src/radarr-csv.js`).
+- `npm run radarr-adopt`: Bulk-adopts an existing movie folder into Radarr via API (`node src/radarr-adopt.js`).
 - `npm run install-deps`: Installs optional dependencies via `scripts/install-deps.js` (if present/needed).
 - `npm test`: Currently not wired up (the repo contains tests, but `npm test` exits with "no test specified").

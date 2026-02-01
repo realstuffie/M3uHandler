@@ -7,6 +7,8 @@
     "cli": "node src/index.js",
     "daemon": "node src/daemon.js",
     "config": "node src/config.js",
+    "radarr-csv": "node src/radarr-csv.js",
+    "radarr-adopt": "node src/radarr-adopt.js",
     "install-deps": "node scripts/install-deps.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
