@@ -70,7 +70,7 @@ function parseShowTitleAndEpisode(displayName, fallbackGroupTitle) {
   return { showBase, season, episode, kodiEpisodeTag };
 }
 
-function decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYear, defaultType = null }) {
+function decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYear, moviesByFolder = false, defaultType = null }) {
   const type = (attrs['tvg-type'] || '').toLowerCase() || (defaultType || '').toLowerCase();
   const groupTitle = attrs['group-title'] || 'Unknown';
 
@@ -104,6 +104,11 @@ function decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYea
     const year = yearFromTitle || yearFromGroup || 'Unknown';
 
     const movieName = sanitizeSegment(displayName) || sanitizeSegment(attrs['tvg-name'] || 'Unknown Movie');
+
+    if (moviesByFolder) {
+      return path.join('Movies', movieName, `${movieName}.strm`);
+    }
+
     return moviesByYear ? path.join('Movies', year, `${movieName}.strm`) : path.join('Movies', `${movieName}.strm`);
   }
 
@@ -124,6 +129,7 @@ async function convertM3U({
   overwrite = false,
   dryRun = false,
   moviesByYear = true,
+  moviesByFolder = false,
   deleteMissing = false,
   ignoredLogPath = null,
   defaultType = null,
@@ -175,7 +181,7 @@ async function convertM3U({
       const { attrs, displayName } = parseExtinf(pendingExtinf);
       pendingExtinf = null;
 
-      const rel = decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYear, defaultType });
+      const rel = decideOutputForEntry({ attrs, displayName }, { includeLive, moviesByYear, moviesByFolder, defaultType });
       if (!rel) {
         stats.ignored++;
         if (ignoredStream) {

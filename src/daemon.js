@@ -28,6 +28,7 @@ function parseArgs(argv) {
     includeLive: false,
     overwrite: true, // daemon default
     moviesByYear: true,
+    moviesByFolder: false,
     deleteMissing: true, // per request
     intervalSeconds: 24 * 60 * 60,
     once: false,
@@ -42,6 +43,7 @@ function parseArgs(argv) {
     else if (a === '--include-live') args.includeLive = true;
     else if (a === '--no-delete-missing') args.deleteMissing = false;
     else if (a === '--movies-flat') args.moviesByYear = false;
+    else if (a === '--movies-by-folder') args.moviesByFolder = true;
     else if (a === '--interval-seconds') args.intervalSeconds = Number(argv[++i]);
     else if (a === '--interval-hours') args.intervalSeconds = Number(argv[++i]) * 60 * 60;
     else if (a === '--once') args.once = true;
@@ -65,6 +67,7 @@ Options:
   -o, --out <dir>              Output directory (default: output, overridden by config)
       --include-live           Also write live .strm entries (overridden by config)
       --movies-flat            Put movies directly under Movies/ (no Movies/<Year>/) (overridden by config)
+      --movies-by-folder       Put movies under Movies/<Movie Name>/<Movie Name>.strm (overridden by config)
       --no-delete-missing      Do not delete .strm files missing from latest playlist
       --interval-hours <n>     Poll interval in hours (default: 24, overridden by config)
       --interval-seconds <n>   Poll interval in seconds (overrides hours)
@@ -100,7 +103,7 @@ function sanitizeLogMessage(msg, secrets = []) {
   return s;
 }
 
-async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, deleteMissing, defaultType = null }) {
+async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, moviesByFolder, deleteMissing, defaultType = null }) {
   const tmp = path.join(os.tmpdir(), `m3uHandler-${Date.now()}-${Math.random().toString(16).slice(2)}.m3u8`);
   try {
     const text = await fetchText(url);
@@ -112,6 +115,7 @@ async function runOnce({ url, outRoot, includeLive, overwrite, moviesByYear, del
       includeLive,
       overwrite,
       moviesByYear,
+      moviesByFolder,
       deleteMissing,
       dryRun: false,
       defaultType,
@@ -177,6 +181,7 @@ async function main() {
   const outRoot = path.resolve(cfg?.out || args.out);
   const includeLive = cfg?.includeLive ?? args.includeLive;
   const moviesByYear = cfg?.moviesFlat ? false : args.moviesByYear;
+  const moviesByFolder = cfg?.moviesByFolder ?? args.moviesByFolder;
   const intervalSeconds = Number.isFinite(cfg?.intervalHours) ? cfg.intervalHours * 60 * 60 : args.intervalSeconds;
 
   const urlsToRun = [];
@@ -219,6 +224,7 @@ Delete missing: ${args.deleteMissing}`);
           includeLive,
           overwrite: args.overwrite,
           moviesByYear,
+          moviesByFolder,
           deleteMissing: args.deleteMissing && isLast,
           defaultType,
         });

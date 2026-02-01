@@ -63,3 +63,25 @@ test('generate movie+tv+live when includeLive=true (dry-run)', async () => {
   assert.equal(res.stats.ignored, 0);
   assert.ok(res.lastWritten);
 });
+
+test('movie in its own folder when moviesByFolder=true (dry-run)', async () => {
+  const dir = makeTempDir();
+  const infile = path.join(dir, 'sample.m3u8');
+  fs.writeFileSync(infile, SAMPLE, 'utf8');
+
+  const res = await convertM3U({
+    inputPath: infile,
+    outRoot: dir,
+    includeLive: false,
+    overwrite: true,
+    dryRun: false,
+    moviesByYear: true,
+    moviesByFolder: true,
+    deleteMissing: false,
+  });
+
+  const movieName = 'Raat Akeli Hai - The Bansal Murders (2025)';
+  const expected = path.join(dir, 'Movies', movieName, `${movieName}.strm`);
+
+  assert.ok(fs.existsSync(expected), `Expected movie .strm at: ${expected}`);
+});

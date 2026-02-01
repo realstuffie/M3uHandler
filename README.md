@@ -6,7 +6,8 @@ A command-line utility to process M3U/M3U8 playlists and organize their entries 
 
 This tool parses a master M3U playlist and categorizes each entry into `Movies`, `TV Shows`, or `Live` streams. It then creates a directory structure and writes individual `.strm` files, which are recognized by many media server applications.
 
-- Movies are organized by year (e.g., `Movies/2023/My Movie.strm`).
+- Movies are organized by year (e.g., `Movies/2023/My Movie.strm`) by default.
+- Movies can also be organized “flat” (e.g., `Movies/My Movie.strm`) or “by folder” (e.g., `Movies/My Movie/My Movie.strm`).
 - TV shows are organized by show name and season (e.g., `TV Shows/My Show/Season 01/S01E01 - Pilot.strm`). Treats the TV shows URL as multiple paginated links.
 - Live streams are typically ignored unless specified.
 
@@ -51,6 +52,7 @@ node src/daemon.js --url "<m3u_url>" [options]
 | `--out <dir>` | `-o`     | Output directory (default: `output`, overridden by config)  | `output` |
 | `--include-live`         | Also write live `.strm` entries (overridden by config)  | `false` |
 | `--movies-flat`          | Put movies directly under `Movies/` (no `Movies/<Year>/`) (overridden by config)  | `false` |
+| `--movies-by-folder`     | Put movies under `Movies/<Movie Name>/<Movie Name>.strm` (overridden by config)  | `false` |
 | `--no-delete-missing`    | Do not delete `.strm` files missing from latest playlist
 | `--interval-hours <n>`   | Poll interval in hours (default: `24`, overridden by config) | `24` |
 | `--interval-seconds <n>` | Poll interval in seconds (overrides hours)
