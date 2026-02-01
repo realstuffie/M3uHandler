@@ -9,8 +9,9 @@
     "config": "node src/config.js",
     "radarr-csv": "node src/radarr-csv.js",
     "radarr-adopt": "node src/radarr-adopt.js",
-    "install-deps": "node scripts/install-deps.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "install-deps": "node src/install-deps.js",
+    "lint:check": "node --check src/*.js",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",

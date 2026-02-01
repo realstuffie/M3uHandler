@@ -1,30 +1,42 @@
 # m3uHandler
 
-A command-line utility to process M3U/M3U8 playlists and organize their entries into structured `.strm` files for media servers.
+Turn an IPTV-style M3U/M3U8 playlist into a media-server-friendly folder of `.strm` files.
 
-## Overview
+`m3uHandler` reads a playlist, categorizes entries into **Movies**, **TV Shows**, and optionally **Live**, then writes a clean directory structure that Emby/Jellyfin/Kodi/etc can scan.
 
-This tool parses a master M3U playlist and categorizes each entry into `Movies`, `TV Shows`, or `Live` streams. It then creates a directory structure and writes individual `.strm` files, which are recognized by many media server applications.
+## What it does (at a glance)
 
-- Movies are organized by year (e.g., `Movies/2023/My Movie.strm`) by default.
-- Movies can also be organized “flat” (e.g., `Movies/My Movie.strm`) or “by folder” (e.g., `Movies/My Movie/My Movie.strm`).
-- TV shows are organized by show name and season (e.g., `TV Shows/My Show/Season 01/S01E01 - Pilot.strm`). Treats the TV shows URL as multiple paginated links.
-- Live streams are typically ignored unless specified.
+- **Movies**
+  - Default: `Movies/<Year>/<Title>.strm` (example: `Movies/2023/My Movie.strm`)
+  - Optional layouts: “flat” (`Movies/My Movie.strm`) or “by folder” (`Movies/My Movie/My Movie.strm`)
+- **TV Shows**
+  - `TV Shows/<Show>/Season 01/S01E01 - Episode.strm`
+  - Treats the TV shows URL as multiple paginated links
+- **Live**
+  - Ignored by default (enable via `--include-live`)
 
 ## Prerequisites
 
-- Node.js version 18 or higher.
+- Node.js **18+**
 
-## Installation
-
-1. Clone the repository.
-2. Install dependencies:
+## Install
 
 ```bash
 npm install
 ```
 
-*(Note: there is an `npm run install-deps` helper script, but `npm install` is enough for standard setups.)*
+Optional helper (mainly useful in CI because it switches to `npm ci` automatically):
+
+```bash
+npm run install-deps
+```
+
+What `npm run install-deps` does:
+
+- Windows: runs `npm.cmd`
+- macOS/Linux: runs `npm`
+- If `CI` is set: runs `npm ci`
+- Otherwise: runs `npm install`
 
 ## Logging
 
@@ -39,23 +51,25 @@ Example:
 M3UHANDLER_LOG_PATH="output/custom.log" node src/daemon.js --url "<m3u_url>" --once
 ```
 
-## Usage
+## Quick start
 
-This tool is designed to be used with ApolloGroupTV M3U files, but may work for other providers.
-
-The project currently exposes a **daemon-style CLI** (`src/daemon.js`) which periodically fetches an M3U URL and generates `.strm` files. (The `package.json` mentions `src/index.js` / `src/config.js`, but those entrypoints are not present in this repo.)
-
-### Run (single update)
+One-time run (fetch playlist, generate `.strm` files, then exit):
 
 ```bash
 node src/daemon.js --url "<m3u_url>" --once
 ```
 
-### Run (daemon mode)
+Daemon mode (poll periodically):
 
 ```bash
 node src/daemon.js --url "<m3u_url>" [options]
 ```
+
+### Notes
+
+- Built around ApolloGroupTV-style playlists, but may work with other providers.
+- The main entrypoint is the **daemon-style CLI**: `src/daemon.js`.
+- `npm run cli` and `npm run config` currently point at files that are **not present** in this repo (`src/index.js`, `src/config.js`), so those scripts will fail unless you add them.
 
 ### Options (daemon)
 
@@ -131,12 +145,12 @@ Notes:
 - The script defaults to `monitored=true` and does **not** trigger automatic searching/downloading unless you pass `--search`.
 - Resume support: state is written to `output/radarr-adopt-state.json` so you can re-run and it will skip already-added paths.
 
-## Available Scripts
+## Useful npm scripts
 
-You can use `npm run <script-name>` to execute the following commands:
-
-- `npm run daemon`: Runs the daemon CLI (`node src/daemon.js`).
-- `npm run radarr-csv`: Generates a Radarr TMDb List import CSV from an M3U file (`node src/radarr-csv.js`).
-- `npm run radarr-adopt`: Bulk-adopts an existing movie folder into Radarr via API (`node src/radarr-adopt.js`).
-- `npm run install-deps`: Installs optional dependencies via `scripts/install-deps.js` (if present/needed).
-- `npm test`: Currently not wired up (the repo contains tests, but `npm test` exits with "no test specified").
+- `npm run daemon` — run the main daemon CLI (`node src/daemon.js`)
+- `npm run radarr-csv` — generate a Radarr TMDb List import CSV (`node src/radarr-csv.js`)
+- `npm run radarr-adopt` — bulk-adopt an existing movie folder into Radarr via API (`node src/radarr-adopt.js`)
+- `npm run install-deps` — wrapper around npm install / npm ci (`node src/install-deps.js`)
+- `npm test` — run tests (`node --test`)
+- `npm run cli` — points at `src/index.js` (missing)
+- `npm run config` — points at `src/config.js` (missing)
