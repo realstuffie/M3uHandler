@@ -1,3 +1,7 @@
+<p align="center-left">
+  <img src="assets/logo.svg" alt="m3uHandler logo" width="200" />
+</p>
+
 # m3uHandler
 
 Turn an IPTV-style M3U/M3U8 playlist into a media-server-friendly folder of `.strm` files.
