@@ -73,7 +73,6 @@ node src/daemon.js --url "<m3u_url>" [options]
 
 - Built around ApolloGroupTV-style playlists, but may work with other providers.
 - The main entrypoint is the **daemon-style CLI**: `src/daemon.js`.
-- `npm run cli` and `npm run config` currently point at files that are **not present** in this repo (`src/index.js`, `src/config.js`), so those scripts will fail unless you add them.
 
 ### Options (daemon)
 
@@ -156,5 +155,3 @@ Notes:
 - `npm run radarr-adopt` — bulk-adopt an existing movie folder into Radarr via API (`node src/radarr-adopt.js`)
 - `npm run install-deps` — wrapper around npm install / npm ci (`node src/install-deps.js`)
 - `npm test` — run tests (`node --test`)
-- `npm run cli` — points at `src/index.js` (missing)
-- `npm run config` — points at `src/config.js` (missing)

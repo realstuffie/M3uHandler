@@ -1,22 +1,17 @@
 {
   "name": "m3uhandler",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Turn an IPTV-style M3U/M3U8 playlist into a media-server-friendly folder of .strm files.",
+  "private": true,
   "scripts": {
-    "cli": "node src/index.js",
     "daemon": "node src/daemon.js",
-    "config": "node src/config.js",
     "radarr-csv": "node src/radarr-csv.js",
     "radarr-adopt": "node src/radarr-adopt.js",
     "install-deps": "node src/install-deps.js",
-    "lint:check": "node --check src/*.js",
+    "lint:check": "node --check src/*.js tests/*.js",
     "test": "node --test"
   },
-  "keywords": [],
-  "author": "",
   "license": "GPL-3.0-or-later",
-  "dependencies": {},
   "engines": {
     "node": ">=18"
   }
