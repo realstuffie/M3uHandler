@@ -126,7 +126,9 @@ If Radarr’s GUI “Library Import” errors out on very large libraries, you c
 
 This expects a folder layout like:
 
-- `/mnt/share/Emby/Movies/Movies/Movie Title (2010)/...` (folder per movie)
+- `<location>/Movie Title (2010)/...` (folder per movie)
+
+Pass `--location <path>` to `radarr-adopt` to set `<location>` explicitly.
 
 The script parses `Title (Year)` from the folder name, uses Radarr’s lookup endpoint to resolve the TMDb ID, then POSTs to Radarr in batches (default: **1000**).
 
@@ -141,14 +143,14 @@ Dry-run (no API calls to add movies):
 
 ```bash
 RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
-  npm run radarr-adopt -- --library-path "/mnt/share/Emby/Movies/Movies" --root-folder "/mnt/share/Emby/Movies/Movies" --dry-run
+  npm run radarr-adopt -- --location "[your movies folder]" --dry-run
 ```
 
 Actual import (batch size 1000):
 
 ```bash
 RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
-  npm run radarr-adopt -- --library-path "/mnt/share/Emby/Movies/Movies" --root-folder "/mnt/share/Emby/Movies/Movies" --batch-size 1000
+  npm run radarr-adopt -- --location "[your movies folder]" --batch-size 1000
 ```
 
 Notes:

@@ -448,13 +448,17 @@ function printHelp() {
 
 Usage:
   RADARR_URL="http://127.0.0.1:7878" RADARR_API_KEY="..." \\
-    node src/radarr-adopt.js --library-path "/mnt/share/Emby/Movies/Movies" --root-folder "/mnt/share/Emby/Movies/Movies"
+    node src/radarr-adopt.js --location "/mnt/share/Emby/Movies/Movies"
 
 Required:
-  --library-path <path>    Path containing movie folders like "Title (Year)"
-  --root-folder <path>     Radarr rootFolderPath (must match a configured root folder in Radarr)
+  --location <path>        Library root folder. Used as:
+                           - scan location (same as --library-path)
+                           - Radarr rootFolderPath (same as --root-folder)
+                           Must contain folders like "Title (Year)".
 
 Optional:
+  --library-path <path>    Override scan location (advanced)
+  --root-folder <path>     Override Radarr rootFolderPath (advanced; must match a configured root folder in Radarr)
   --batch-size <n>             Default 1000
   --monitored <true|false>     Default true
   --search                     If set, Radarr will search for missing movies after add (default: off)
@@ -483,8 +487,10 @@ if (require.main === module) {
   const baseUrl = process.env.RADARR_URL;
   const apiKey = process.env.RADARR_API_KEY;
 
-  const libraryPath = getArg('--library-path') || getArg('--library') || getArg('-l');
-  const rootFolderPath = getArg('--root-folder') || getArg('--root') || getArg('-r');
+  const location = getArg('--location');
+
+  const libraryPath = location || getArg('--library-path') || getArg('--library') || getArg('-l');
+  const rootFolderPath = location || getArg('--root-folder') || getArg('--root') || getArg('-r');
 
   const batchSize = Number(getArg('--batch-size') || 1000);
   const monitored = (getArg('--monitored') || 'true').toLowerCase() !== 'false';
