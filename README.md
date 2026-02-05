@@ -84,18 +84,19 @@ m3uhandler --url "<m3u_url>" [options]
 
 ### Options (daemon)
 
-|  Flag  |  Alias          | Description  |  Default  |
-| `--url <url>`            | Playlist URL to fetch (omit if using `--use-config`)  |
-| `--use-config`           | Load URL + settings from plaintext config (`~/.config/m3uHandler/config.json`)  | `false` |
-| `--out <dir>` | `-o`     | Output directory (default: `output`, overridden by config)  | `output` |
-| `--include-live`         | Also write live `.strm` entries (overridden by config)  | `false` |
-| `--movies-flat`          | Put movies directly under `Movies/` (no `Movies/<Year>/`) (overridden by config)  | `false` |
-| `--movies-by-folder`     | Put movies under `Movies/<Movie Name>/<Movie Name>.strm` (overridden by config)  | `false` |
-| `--no-delete-missing`    | Do not delete `.strm` files missing from latest playlist
-| `--interval-hours <n>`   | Poll interval in hours (default: `24`, overridden by config) | `24` |
-| `--interval-seconds <n>` | Poll interval in seconds (overrides hours)
-| `--once`                 | Run one update and exit | `false` |
-| `--help` | `-h`          | Show help
+| Flag | Alias | Description | Default |
+|---|---|---|---|
+| `--url <url>` | — | Playlist URL to fetch (omit if using `--use-config`) | — |
+| `--use-config` | — | Load URL + settings from plaintext config (`~/.config/m3uHandler/config.json`) | `false` |
+| `--out <dir>` | `-o` | Output directory (default: `output`, overridden by config) | `output` |
+| `--include-live` | — | Also write live `.strm` entries (overridden by config) | `false` |
+| `--movies-flat` | — | Put movies directly under `Movies/` (no `Movies/<Year>/`) (overridden by config) | `false` |
+| `--movies-by-folder` | — | Put movies under `Movies/<Movie Name>/<Movie Name>.strm` (overridden by config) | `false` |
+| `--no-delete-missing` | — | Do not delete `.strm` files missing from latest playlist | — |
+| `--interval-hours <n>` | — | Poll interval in hours (default: `24`, overridden by config) | `24` |
+| `--interval-seconds <n>` | — | Poll interval in seconds (overrides hours) | — |
+| `--once` | — | Run one update and exit | `false` |
+| `--help` | `-h` | Show help | — |
 
 ## Radarr CSV export (TMDb List CSV)
 
