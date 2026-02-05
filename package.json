@@ -2,7 +2,14 @@
   "name": "m3uhandler",
   "version": "1.0.0",
   "description": "Turn an IPTV-style M3U/M3U8 playlist into a media-server-friendly folder of .strm files.",
-  "private": true,
+  "bin": {
+    "m3uhandler": "src/cli.js"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "daemon": "node src/daemon.js",
     "radarr-csv": "node src/radarr-csv.js",
@@ -14,5 +21,22 @@
   "license": "GPL-3.0-or-later",
   "engines": {
     "node": ">=18"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/realstuffie/M3uHandler.git"
+  },
+  "bugs": {
+    "url": "https://github.com/realstuffie/M3uHandler/issues"
+  },
+  "homepage": "https://github.com/realstuffie/M3uHandler#readme",
+  "keywords": [
+    "m3u",
+    "iptv",
+    "strm",
+    "radarr",
+    "plex",
+    "jellyfin",
+    "emby"
+  ]
 }

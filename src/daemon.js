@@ -60,7 +60,7 @@ function usage() {
 m3uHandler daemon - periodically fetch an M3U URL and generate .strm files
 
 Usage:
-  node src/daemon.js --url <m3u_url> [options]
+  m3uhandler --url <m3u_url> [options]
 
 Options:
       --url <url>              Playlist URL to fetch (omit if using --use-config)

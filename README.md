@@ -57,17 +57,25 @@ M3UHANDLER_LOG_PATH="output/custom.log" node src/daemon.js --url "<m3u_url>" --o
 
 ## Quick start
 
-One-time run (fetch playlist, generate `.strm` files, then exit):
+Install as a CLI:
 
 ```bash
-node src/daemon.js --url "<m3u_url>" --once
+npm install -g m3uhandler
+```
+
+Run one-time (fetch playlist, generate `.strm` files, then exit):
+
+```bash
+m3uhandler --url "<m3u_url>" --once
 ```
 
 Daemon mode (poll periodically):
 
 ```bash
-node src/daemon.js --url "<m3u_url>" [options]
+m3uhandler --url "<m3u_url>" [options]
 ```
+
+(Dev usage without installing globally: `node src/daemon.js ...`)
 
 ### Notes
 
