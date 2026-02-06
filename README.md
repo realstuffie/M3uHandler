@@ -153,6 +153,25 @@ RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
   npm run radarr-adopt -- --location "[your movies folder]" --batch-size 1000
 ```
 
+### Concurrency flags
+
+`radarr-adopt` uses bounded concurrency for two distinct phases:
+
+- **Lookup**: Radarr `/movie/lookup` requests (TMDb resolution)
+- **Add**: Radarr `/movie` POSTs (adding movies)
+
+Flags:
+
+- `--lookup-concurrency <n>`: parallel lookup requests (default: **10**)
+- `--add-concurrency <n>`: parallel add requests (default: **2**)
+
+Example (reduce load on Radarr):
+
+```bash
+RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
+  npm run radarr-adopt -- --location "[your movies folder]" --lookup-concurrency 3 --add-concurrency 1
+```
+
 Notes:
 
 - The `--root-folder` value **must** match a configured Radarr root folder.
