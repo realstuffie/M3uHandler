@@ -12,7 +12,7 @@ Turn an IPTV-style M3U/M3U8 playlist into a media-server-friendly folder of `.st
 
 - **Movies**
   - Default: `Movies/<Year>/<Title>.strm` (example: `Movies/2023/My Movie.strm`)
-  - Optional layouts: “flat” (`Movies/My Movie.strm`) or “by folder” (`Movies/My Movie/My Movie.strm`)
+  - Optional layouts: "flat" (`Movies/My Movie.strm`) or "by folder" (`Movies/My Movie/My Movie.strm`)
 - **TV Shows**
   - `TV Shows/<Show>/Season 01/S01E01 - Episode.strm`
   - Treats the TV shows URL as multiple paginated links
@@ -100,13 +100,13 @@ m3uhandler --url "<m3u_url>" [options]
 
 ## Radarr CSV export (TMDb List CSV)
 
-This repo now includes a helper script to generate a Radarr-compatible CSV for **Settings → Lists → + → TMDb List → “Import List” (CSV)**.
+This repo now includes a helper script to generate a Radarr-compatible CSV for **Settings → Lists → + → TMDb List → "Import List" (CSV)**.
 
 It outputs:
 
 - `Title`
 - `Year`
-- `TmdbId` (blank, since M3U playlists typically don’t provide it)
+- `TmdbId` (blank, since M3U playlists typically don't provide it)
 
 ### Generate CSV
 
@@ -122,7 +122,7 @@ npm run radarr-csv -- --input /path/to/playlist.m3u --output output/radarr.csv -
 
 ## Radarr bulk adopt (bypass GUI import)
 
-If Radarr’s GUI “Library Import” errors out on very large libraries, you can bulk-add (“adopt”) existing movie folders via the Radarr API in batches.
+If Radarr's GUI "Library Import" errors out on very large libraries, you can bulk-add ("adopt") existing movie folders via the Radarr API in batches.
 
 This expects a folder layout like:
 
@@ -130,7 +130,7 @@ This expects a folder layout like:
 
 Pass `--location <path>` to `radarr-adopt` to set `<location>` explicitly.
 
-The script parses `Title (Year)` from the folder name, uses Radarr’s lookup endpoint to resolve the TMDb ID, then POSTs to Radarr in batches (default: **1000**).
+The script parses `Title (Year)` from the folder name, uses Radarr's lookup endpoint to resolve the TMDb ID, then POSTs to Radarr in batches (default: **1000**).
 
 ### Run
 
@@ -178,10 +178,80 @@ Notes:
 - The script defaults to `monitored=true` and does **not** trigger automatic searching/downloading unless you pass `--search`.
 - Resume support: state is written to `output/radarr-adopt-state.json` so you can re-run and it will skip already-added paths.
 
+## Sonarr bulk adopt (bypass GUI import)
+
+If Sonarr's GUI "Library Import" errors out on very large libraries, you can bulk-add ("adopt") existing series folders via the Sonarr API in batches.
+
+This expects a folder layout like:
+
+- `<location>/Show Title (2010)/...` (folder per series, year optional)
+
+Pass `--location <path>` to `sonarr-adopt` to set `<location>` explicitly.
+
+The script parses `Title (Year)` (or just `Title`) from the folder name, uses Sonarr's lookup endpoint to resolve the TVDB ID, then POSTs to Sonarr in batches (default: **1000**).
+
+### Run
+
+Set environment variables:
+
+- `SONARR_URL` (example: `http://[your local sonarr ip]:8989`)
+- `SONARR_API_KEY` (Sonarr → Settings → General → Security)
+
+Dry-run (no API calls to add series):
+
+```bash
+SONARR_URL="http://[your local sonarr ip]:8989" SONARR_API_KEY="..." \
+  npm run sonarr-adopt -- --location "[your tv shows folder]" --dry-run
+```
+
+Actual import (batch size 1000):
+
+```bash
+SONARR_URL="http://[your local sonarr ip]:8989" SONARR_API_KEY="..." \
+  npm run sonarr-adopt -- --location "[your tv shows folder]" --batch-size 1000
+```
+
+### Concurrency flags
+
+`sonarr-adopt` uses bounded concurrency for two distinct phases:
+
+- **Lookup**: Sonarr `/series/lookup` requests (TVDB resolution)
+- **Add**: Sonarr `/series` POSTs (adding series)
+
+Flags:
+
+- `--lookup-concurrency <n>`: parallel lookup requests (default: **10**)
+- `--add-concurrency <n>`: parallel add requests (default: **2**)
+
+Example (reduce load on Sonarr):
+
+```bash
+SONARR_URL="http://[your local sonarr ip]:8989" SONARR_API_KEY="..." \
+  npm run sonarr-adopt -- --location "[your tv shows folder]" --lookup-concurrency 3 --add-concurrency 1
+```
+
+### Additional flags
+
+| Flag | Description | Default |
+|---|---|---|
+| `--season-folder <true\|false>` | Organise episodes into per-season sub-folders | `true` |
+| `--series-type <type>` | `standard`, `daily`, or `anime` | `standard` |
+| `--quality-profile <n>` | Quality profile ID | `1` |
+| `--language-profile <n>` | Language profile ID | `1` |
+| `--search` | Search for missing episodes after add | `false` |
+| `--monitored <true\|false>` | Mark series as monitored | `true` |
+
+Notes:
+
+- The `--root-folder` value **must** match a configured Sonarr root folder.
+- The script defaults to `monitored=true` and does **not** trigger automatic searching/downloading unless you pass `--search`.
+- Resume support: state is written to `output/sonarr-adopt-state.json` so you can re-run and it will skip already-added paths.
+
 ## Useful npm scripts
 
 - `npm run daemon` — run the main daemon CLI (`node src/daemon.js`)
 - `npm run radarr-csv` — generate a Radarr TMDb List import CSV (`node src/radarr-csv.js`)
 - `npm run radarr-adopt` — bulk-adopt an existing movie folder into Radarr via API (`node src/radarr-adopt.js`)
+- `npm run sonarr-adopt` — bulk-adopt an existing TV shows folder into Sonarr via API (`node src/sonarr-adopt.js`)
 - `npm run install-deps` — wrapper around npm install / npm ci (`node src/install-deps.js`)
 - `npm test` — run tests (`node --test`)
