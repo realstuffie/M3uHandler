@@ -1,257 +1,236 @@
-<p align="center-left">
-  <img src="assets/logo.svg" alt="m3uHandler logo" width="200" />
-</p>
-
-# m3uHandler
+# m3uHandler (Go rewrite)
 
 Turn an IPTV-style M3U/M3U8 playlist into a media-server-friendly folder of `.strm` files.
 
-`m3uHandler` reads a playlist, categorizes entries into **Movies**, **TV Shows**, and optionally **Live**, then writes a clean directory structure that Emby/Jellyfin/Kodi/etc can scan.
-
-## What it does (at a glance)
-
-- **Movies**
-  - Default: `Movies/<Year>/<Title>.strm` (example: `Movies/2023/My Movie.strm`)
-  - Optional layouts: "flat" (`Movies/My Movie.strm`) or "by folder" (`Movies/My Movie/My Movie.strm`)
-- **TV Shows**
-  - `TV Shows/<Show>/Season 01/S01E01 - Episode.strm`
-  - Treats the TV shows URL as multiple paginated links
-- **Live**
-  - Ignored by default (enable via `--include-live`)
+Reads a playlist, categorises entries into **Movies**, **TV Shows**, **Sports VOD**, and optionally **Live**, then writes a clean directory structure that Emby / Jellyfin / Plex / Kodi can scan.
 
 ## Prerequisites
 
-- Node.js **18+**
+- Go **1.22+**
 
-## Install
-
-```bash
-npm install
-```
-
-Optional helper (mainly useful in CI because it switches to `npm ci` automatically):
+## Build
 
 ```bash
-npm run install-deps
+go build -o m3uhandler .
 ```
 
-What `npm run install-deps` does:
+## Subcommands
 
-- Windows: runs `npm.cmd`
-- macOS/Linux: runs `npm`
-- If `CI` is set: runs `npm ci`
-- Otherwise: runs `npm install`
+| Subcommand | Description |
+| --- | --- |
+| `daemon` | Fetch playlist(s) and write `.strm` files, optionally on a schedule |
+| `radarr-csv` | Generate a Radarr TMDb List CSV from a movies playlist |
+| `radarr-adopt` | Bulk-import an existing movie library into Radarr via API |
+| `sonarr-adopt` | Bulk-import an existing TV library into Sonarr via API |
 
-## Logging
+---
 
-All CLIs write logs to both the console and a log file.
+## daemon
 
-- Default log path: `output/m3uHandler.log`
-- Override via environment variable: `M3UHANDLER_LOG_PATH`
+Fetches one or more playlist URLs and writes `.strm` files. Runs once or on a repeating interval.
 
-Example:
+### Directory layout
+
+| Type | Layout |
+| --- | --- |
+| Movies (default) | `Movies/<Year>/<Title>.strm` |
+| `--movies-flat` | `Movies/<Title>.strm` |
+| `--movies-by-folder` | `Movies/<Title>/<Title>.strm` |
+| `--movies-by-year-folder` | `Movies/<Year>/<Title>/<Title>.strm` |
+| TV Shows | `TV Shows/<Show>/Season 01/<Show> S01E01.strm` |
+| Live | `Live/<Group>/<Channel>.strm` |
+| Sports VOD | `Sports VOD/<Group>/<Event>.strm` |
+
+### Usage
 
 ```bash
-M3UHANDLER_LOG_PATH="output/custom.log" node src/daemon.js --url "<m3u_url>" --once
+./m3uhandler daemon [options]
 ```
 
-## Quick start
-
-Install as a CLI:
-
-```bash
-npm install -g m3uhandler
-```
-
-Run one-time (fetch playlist, generate `.strm` files, then exit):
-
-```bash
-m3uhandler --url "<m3u_url>" --once
-```
-
-Daemon mode (poll periodically):
-
-```bash
-m3uhandler --url "<m3u_url>" [options]
-```
-
-(Dev usage without installing globally: `node src/daemon.js ...`)
-
-### Notes
-
-- Built around ApolloGroupTV-style playlists, but may work with other providers.
-- The main entrypoint is the **daemon-style CLI**: `src/daemon.js`.
-
-### Options (daemon)
-
-| Flag | Alias | Description | Default |
-|---|---|---|---|
-| `--url <url>` | — | Playlist URL to fetch (omit if using `--use-config`) | — |
-| `--use-config` | — | Load URL + settings from plaintext config (`~/.config/m3uHandler/config.json`) | `false` |
-| `--out <dir>` | `-o` | Output directory (default: `output`, overridden by config) | `output` |
-| `--include-live` | — | Also write live `.strm` entries (overridden by config) | `false` |
-| `--movies-flat` | — | Put movies directly under `Movies/` (no `Movies/<Year>/`) (overridden by config) | `false` |
-| `--movies-by-folder` | — | Put movies under `Movies/<Movie Name>/<Movie Name>.strm` (overridden by config) | `false` |
-| `--no-delete-missing` | — | Do not delete `.strm` files missing from latest playlist | — |
-| `--interval-hours <n>` | — | Poll interval in hours (default: `24`, overridden by config) | `24` |
-| `--interval-seconds <n>` | — | Poll interval in seconds (overrides hours) | — |
-| `--once` | — | Run one update and exit | `false` |
-| `--help` | `-h` | Show help | — |
-
-## Radarr CSV export (TMDb List CSV)
-
-This repo now includes a helper script to generate a Radarr-compatible CSV for **Settings → Lists → + → TMDb List → "Import List" (CSV)**.
-
-It outputs:
-
-- `Title`
-- `Year`
-- `TmdbId` (blank, since M3U playlists typically don't provide it)
-
-### Generate CSV
-
-```bash
-npm run radarr-csv -- --input /path/to/playlist.m3u --output output/radarr.csv
-```
-
-Optional: if the playlist does not include years in titles, you can set a default year:
-
-```bash
-npm run radarr-csv -- --input /path/to/playlist.m3u --output output/radarr.csv --default-year 2024
-```
-
-## Radarr bulk adopt (bypass GUI import)
-
-If Radarr's GUI "Library Import" errors out on very large libraries, you can bulk-add ("adopt") existing movie folders via the Radarr API in batches.
-
-This expects a folder layout like:
-
-- `<location>/Movie Title (2010)/...` (folder per movie)
-
-Pass `--location <path>` to `radarr-adopt` to set `<location>` explicitly.
-
-The script parses `Title (Year)` from the folder name, uses Radarr's lookup endpoint to resolve the TMDb ID, then POSTs to Radarr in batches (default: **1000**).
-
-### Run
-
-Set environment variables:
-
-- `RADARR_URL` (example: `http://[your local radarr ip]:7878`)
-- `RADARR_API_KEY` (Radarr → Settings → General → Security)
-
-Dry-run (no API calls to add movies):
-
-```bash
-RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
-  npm run radarr-adopt -- --location "[your movies folder]" --dry-run
-```
-
-Actual import (batch size 1000):
-
-```bash
-RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
-  npm run radarr-adopt -- --location "[your movies folder]" --batch-size 1000
-```
-
-### Concurrency flags
-
-`radarr-adopt` uses bounded concurrency for two distinct phases:
-
-- **Lookup**: Radarr `/movie/lookup` requests (TMDb resolution)
-- **Add**: Radarr `/movie` POSTs (adding movies)
-
-Flags:
-
-- `--lookup-concurrency <n>`: parallel lookup requests (default: **10**)
-- `--add-concurrency <n>`: parallel add requests (default: **2**)
-
-Example (reduce load on Radarr):
-
-```bash
-RADARR_URL="http://[your local radarr ip]:7878" RADARR_API_KEY="..." \
-  npm run radarr-adopt -- --location "[your movies folder]" --lookup-concurrency 3 --add-concurrency 1
-```
-
-Notes:
-
-- The `--root-folder` value **must** match a configured Radarr root folder.
-- The script defaults to `monitored=true` and does **not** trigger automatic searching/downloading unless you pass `--search`.
-- Resume support: state is written to `output/radarr-adopt-state.json` so you can re-run and it will skip already-added paths.
-
-## Sonarr bulk adopt (bypass GUI import)
-
-If Sonarr's GUI "Library Import" errors out on very large libraries, you can bulk-add ("adopt") existing series folders via the Sonarr API in batches.
-
-This expects a folder layout like:
-
-- `<location>/Show Title (2010)/...` (folder per series, year optional)
-
-Pass `--location <path>` to `sonarr-adopt` to set `<location>` explicitly.
-
-The script parses `Title (Year)` (or just `Title`) from the folder name, uses Sonarr's lookup endpoint to resolve the TVDB ID, then POSTs to Sonarr in batches (default: **1000**).
-
-### Run
-
-Set environment variables:
-
-- `SONARR_URL` (example: `http://[your local sonarr ip]:8989`)
-- `SONARR_API_KEY` (Sonarr → Settings → General → Security)
-
-Dry-run (no API calls to add series):
-
-```bash
-SONARR_URL="http://[your local sonarr ip]:8989" SONARR_API_KEY="..." \
-  npm run sonarr-adopt -- --location "[your tv shows folder]" --dry-run
-```
-
-Actual import (batch size 1000):
-
-```bash
-SONARR_URL="http://[your local sonarr ip]:8989" SONARR_API_KEY="..." \
-  npm run sonarr-adopt -- --location "[your tv shows folder]" --batch-size 1000
-```
-
-### Concurrency flags
-
-`sonarr-adopt` uses bounded concurrency for two distinct phases:
-
-- **Lookup**: Sonarr `/series/lookup` requests (TVDB resolution)
-- **Add**: Sonarr `/series` POSTs (adding series)
-
-Flags:
-
-- `--lookup-concurrency <n>`: parallel lookup requests (default: **10**)
-- `--add-concurrency <n>`: parallel add requests (default: **2**)
-
-Example (reduce load on Sonarr):
-
-```bash
-SONARR_URL="http://[your local sonarr ip]:8989" SONARR_API_KEY="..." \
-  npm run sonarr-adopt -- --location "[your tv shows folder]" --lookup-concurrency 3 --add-concurrency 1
-```
-
-### Additional flags
+### Options
 
 | Flag | Description | Default |
-|---|---|---|
-| `--season-folder <true\|false>` | Organise episodes into per-season sub-folders | `true` |
+| --- | --- | --- |
+| `--url <url>` | Generic playlist URL | — |
+| `--url-tv <url>` | TV shows URL; if URL ends with a number it auto-paginates until a 4xx | — |
+| `--url-movies <url>` | Movies URL (single, no pagination) | — |
+| `--url-events <url>` | Sports VOD / events URL (single, no pagination) | — |
+| `--use-config` | Load URLs + settings from `~/.config/m3uHandler/config.json` | `false` |
+| `-o, --out <dir>` | Output directory | `output` |
+| `--include-live` | Also write live `.strm` entries | `false` |
+| `--movies-flat` | Put movies directly under `Movies/` | `false` |
+| `--movies-by-folder` | `Movies/<Title>/<Title>.strm` | `false` |
+| `--movies-by-year-folder` | `Movies/<Year>/<Title>/<Title>.strm` | `false` |
+| `--no-delete-missing` | Do not delete `.strm` files absent from latest playlist | `false` |
+| `--no-overwrite` | Skip writing a `.strm` that already exists on disk | `false` |
+| `--skip-if-media-exists` | Skip if a local media file with the same base name exists | `false` |
+| `--write-concurrency <n>` | Parallel `.strm` writers | `8` |
+| `--progress-every <n>` | Log progress every N entries | `1000` |
+| `--interval-hours <n>` | Poll interval in hours | `24` |
+| `--interval-seconds <n>` | Poll interval in seconds (overrides hours) | — |
+| `--once` | Run one update and exit | `false` |
+| `-h, --help` | Show help | — |
+
+**Environment variables:**
+
+- `FETCH_TIMEOUT_MS` — HTTP fetch timeout in milliseconds (default: `300000` / 5 min)
+- `M3UHANDLER_LOG_PATH` — override log file path (default: `output/m3uHandler.log`)
+
+### Examples
+
+**Movies only (year+folder layout, skip already-downloaded):**
+
+```bash
+./m3uhandler daemon \
+  --url-movies "https://provider/api/list/USER/PASS/m3u8/movies" \
+  --once -o /mnt/media/ \
+  --movies-by-year-folder \
+  --skip-if-media-exists \
+  --no-delete-missing
+```
+
+**TV shows (auto-paginates from page 1 until 4xx):**
+
+```bash
+./m3uhandler daemon \
+  --url-tv "https://provider/api/list/USER/PASS/m3u8/tvshows/1" \
+  --once -o /mnt/media/ \
+  --no-delete-missing
+```
+
+**Sports VOD:**
+
+```bash
+./m3uhandler daemon \
+  --url-events "https://provider/api/list/USER/PASS/m3u8/events" \
+  --once -o /mnt/media/ \
+  --no-delete-missing
+```
+
+**All sources, daemon mode (refresh every 24h):**
+
+```bash
+./m3uhandler daemon \
+  --url-tv "https://provider/api/list/USER/PASS/m3u8/tvshows/1" \
+  --url-movies "https://provider/api/list/USER/PASS/m3u8/movies" \
+  --url-events "https://provider/api/list/USER/PASS/m3u8/events" \
+  -o /mnt/media/ \
+  --movies-by-year-folder \
+  --skip-if-media-exists \
+  --no-overwrite \
+  --no-delete-missing \
+  --interval-hours 24
+```
+
+---
+
+## radarr-csv
+
+Generate a Radarr-compatible TMDb List CSV from a movies playlist.
+
+```bash
+./m3uhandler radarr-csv --input /path/to/playlist.m3u8 --output output/radarr.csv
+```
+
+---
+
+## radarr-adopt
+
+Bulk-import an existing movie library into Radarr via API, bypassing the GUI importer.
+
+Expects folders named `Title (Year)` directly under `--location`, or one level deeper (e.g. year sub-folders) when `--recursive` is set.
+
+**Environment variables:**
+
+- `RADARR_URL` — e.g. `http://192.168.1.10:7878`
+- `RADARR_API_KEY` — Radarr → Settings → General → Security
+
+### Usage
+
+```bash
+RADARR_URL="http://..." RADARR_API_KEY="..." \
+  ./m3uhandler radarr-adopt --location "/mnt/media/Movies" [options]
+```
+
+### Options
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--location <path>` | Library root (scan path + Radarr rootFolderPath) | required |
+| `--library-path <path>` | Override scan location only | — |
+| `--root-folder <path>` | Override Radarr rootFolderPath only | — |
+| `--recursive` | Also scan one level of subdirectories (e.g. year folders) | `false` |
+| `--monitored <true\|false>` | Mark movies as monitored | `true` |
+| `--search` | Trigger search for missing movies after add | `false` |
+| `--dry-run` | Scan and prepare only; no API calls | `false` |
+| `--lookup-concurrency <n>` | Parallel TMDb lookup requests | `10` |
+| `--add-concurrency <n>` | Parallel add requests | `2` |
+| `--state <path>` | Resume state file | `output/radarr-adopt-state.json` |
+| `--cache <path>` | Lookup cache file | `output/radarr-lookup-cache.json` |
+
+### Example (year-folder layout)
+
+```bash
+RADARR_URL="http://192.168.1.10:7878" RADARR_API_KEY="..." \
+  ./m3uhandler radarr-adopt --location "/mnt/media/Movies" --recursive
+```
+
+**Notes:**
+
+- Progress logged every 200 TMDb lookups.
+- Lookup cache saved every 200 lookups — run is resumable.
+- Already-added paths tracked in state file; re-running skips them.
+
+---
+
+## sonarr-adopt
+
+Bulk-import an existing TV library into Sonarr via API.
+
+Expects folders named `Title (Year)` or `Title` directly under `--location`.
+
+**Environment variables:**
+
+- `SONARR_URL` — e.g. `http://192.168.1.10:8989`
+- `SONARR_API_KEY` — Sonarr → Settings → General → Security
+
+### Usage
+
+```bash
+SONARR_URL="http://..." SONARR_API_KEY="..." \
+  ./m3uhandler sonarr-adopt --location "/mnt/media/TV Shows" [options]
+```
+
+### Options
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--location <path>` | Library root (scan path + Sonarr rootFolderPath) | required |
+| `--library-path <path>` | Override scan location only | — |
+| `--root-folder <path>` | Override Sonarr rootFolderPath only | — |
+| `--monitored <true\|false>` | Mark series as monitored | `true` |
+| `--search` | Trigger search for missing episodes after add | `false` |
+| `--season-folder <true\|false>` | Organise episodes into season sub-folders | `true` |
 | `--series-type <type>` | `standard`, `daily`, or `anime` | `standard` |
 | `--quality-profile <n>` | Quality profile ID | `1` |
 | `--language-profile <n>` | Language profile ID | `1` |
-| `--search` | Search for missing episodes after add | `false` |
-| `--monitored <true\|false>` | Mark series as monitored | `true` |
+| `--dry-run` | Scan and prepare only; no API calls | `false` |
+| `--lookup-concurrency <n>` | Parallel TVDB lookup requests | `10` |
+| `--add-concurrency <n>` | Parallel add requests | `2` |
+| `--state <path>` | Resume state file | `output/sonarr-adopt-state.json` |
+| `--cache <path>` | Lookup cache file | `output/sonarr-lookup-cache.json` |
 
-Notes:
+**Notes:**
 
-- The `--root-folder` value **must** match a configured Sonarr root folder.
-- The script defaults to `monitored=true` and does **not** trigger automatic searching/downloading unless you pass `--search`.
-- Resume support: state is written to `output/sonarr-adopt-state.json` so you can re-run and it will skip already-added paths.
+- Progress logged every 200 TVDB lookups.
+- Lookup cache saved every 200 lookups — run is resumable.
+- Already-added paths tracked in state file; re-running skips them.
 
-## Useful npm scripts
+---
 
-- `npm run daemon` — run the main daemon CLI (`node src/daemon.js`)
-- `npm run radarr-csv` — generate a Radarr TMDb List import CSV (`node src/radarr-csv.js`)
-- `npm run radarr-adopt` — bulk-adopt an existing movie folder into Radarr via API (`node src/radarr-adopt.js`)
-- `npm run sonarr-adopt` — bulk-adopt an existing TV shows folder into Sonarr via API (`node src/sonarr-adopt.js`)
-- `npm run install-deps` — wrapper around npm install / npm ci (`node src/install-deps.js`)
-- `npm test` — run tests (`node --test`)
+## Logging
+
+All subcommands write logs to both stdout and a file.
+
+- Default log path: `output/m3uHandler.log`
+- Override: `M3UHANDLER_LOG_PATH=<path>`
