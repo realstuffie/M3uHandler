@@ -128,6 +128,16 @@ func isAlreadyExistsErr(err error) bool {
 	return false
 }
 
+// isTitleSlugConflict detects a 409 caused by a duplicate TitleSlug in Sonarr's
+// database. This happens when two shows with different years produce the same
+// slug (e.g. "Doctor Doctor (2016)" vs an existing "Doctor Doctor"). The series
+// was not added, but it is not a transient failure — it requires manual
+// intervention in Sonarr to resolve.
+func isTitleSlugConflict(err error) bool {
+	var ae *arr.APIError
+	return errors.As(err, &ae) && ae.Status == 409
+}
+
 // ---- adopt -----------------------------------------------------------------
 
 // AdoptOptions controls the sonarr-adopt run.
@@ -327,6 +337,7 @@ func AdoptLibrary(opts AdoptOptions, log *logger.Logger) (candidates, prepared, 
 	var (
 		addedCount    int64
 		skippedExists int64
+		slugConflicts int64
 		failed        int64
 		stateMu       sync.Mutex
 		existMu       sync.Mutex
@@ -342,6 +353,9 @@ func AdoptLibrary(opts AdoptOptions, log *logger.Logger) (candidates, prepared, 
 		if addErr != nil {
 			if isAlreadyExistsErr(addErr) {
 				atomic.AddInt64(&skippedExists, 1)
+			} else if isTitleSlugConflict(addErr) {
+				atomic.AddInt64(&slugConflicts, 1)
+				log.Warnf("Slug conflict (add manually in Sonarr): %s", series.Path)
 			} else {
 				atomic.AddInt64(&failed, 1)
 				log.Errorf("Failed to add %s: %v", series.Path, addErr)
@@ -368,8 +382,8 @@ func AdoptLibrary(opts AdoptOptions, log *logger.Logger) (candidates, prepared, 
 
 		n := atomic.AddInt64(&addedCount, 1)
 		if n%100 == 0 || int(n) == len(toAdd) {
-			log.Infof("Add progress: %d/%d (skippedExists=%d, failed=%d)",
-				n, len(toAdd), atomic.LoadInt64(&skippedExists), atomic.LoadInt64(&failed))
+			log.Infof("Add progress: %d/%d (skippedExists=%d, slugConflicts=%d, failed=%d)",
+				n, len(toAdd), atomic.LoadInt64(&skippedExists), atomic.LoadInt64(&slugConflicts), atomic.LoadInt64(&failed))
 		}
 	})
 
